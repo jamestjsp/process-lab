@@ -141,6 +141,18 @@ describe("engineering workspace", () => {
         );
       }
 
+      const lowestYLabelBox = await magnitude.locator(".y-label").first().boundingBox();
+      const firstXLabelBox = await magnitude.locator(".x-label").first().boundingBox();
+      assert.ok(lowestYLabelBox);
+      assert.ok(firstXLabelBox);
+      assert.ok(
+        lowestYLabelBox.x + lowestYLabelBox.width <= firstXLabelBox.x ||
+          firstXLabelBox.x + firstXLabelBox.width <= lowestYLabelBox.x ||
+          lowestYLabelBox.y + lowestYLabelBox.height <= firstXLabelBox.y ||
+          firstXLabelBox.y + firstXLabelBox.height <= lowestYLabelBox.y,
+        `Bode axis labels overlap: ${JSON.stringify({lowestYLabelBox, firstXLabelBox})}`,
+      );
+
       await magnitude.focus();
       await page.keyboard.press("ArrowRight");
       await page.waitForFunction(() =>
