@@ -11,6 +11,31 @@ const storageKey = () => {
   return `processlab:hidden-series:${root ? root.dataset.flowId : 'default'}`
 }
 
+const trendLayoutKey = () => {
+  const root = workbench()
+  return `processlab:trend-layout:${root ? root.dataset.flowId : 'default'}`
+}
+
+export function normalizeTrendLayout(value) {
+  return value === 'split' ? 'split' : 'overlay'
+}
+
+function trendLayout() {
+  try {
+    return normalizeTrendLayout(localStorage.getItem(trendLayoutKey()))
+  } catch {
+    return 'overlay'
+  }
+}
+
+function saveTrendLayout(layout) {
+  try {
+    localStorage.setItem(trendLayoutKey(), normalizeTrendLayout(layout))
+  } catch {
+    // The server-rendered overlay remains usable when storage is unavailable.
+  }
+}
+
 function hiddenSeries() {
   try {
     const stored = JSON.parse(localStorage.getItem(storageKey()) || '[]')
@@ -569,6 +594,28 @@ function plotRoots(scope) {
   return [...new Set(roots)]
 }
 
+function trendWorkspaceRoots(scope) {
+  if (!scope) return []
+  const roots = []
+  if (scope.matches?.('[data-trend-workspace]')) roots.push(scope)
+  roots.push(...(scope.querySelectorAll?.('[data-trend-workspace]') || []))
+  return [...new Set(roots)]
+}
+
+export function applyTrendLayout(scope = globalThis.document) {
+  const layout = trendLayout()
+  for (const root of trendWorkspaceRoots(scope)) {
+    root.dataset.trendLayout = layout
+    root.querySelectorAll('[data-trend-layout-value]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.trendLayoutValue === layout))
+    })
+    root.querySelectorAll('[data-trend-layout-panel]').forEach((panel) => {
+      panel.toggleAttribute('hidden', panel.dataset.trendLayoutPanel !== layout)
+    })
+  }
+  return layout
+}
+
 export function applyChartInspection(scope = globalThis.document) {
   return plotRoots(scope).map(initializePlot).filter(Boolean)
 }
@@ -577,27 +624,68 @@ export function applySeriesVisibility() {
   const root = workbench()
   if (!root) return
   const hidden = hiddenSeries()
-  root.querySelectorAll('[data-series-toggle]').forEach((button) => {
+  const buttons = [...root.querySelectorAll('[data-series-toggle]')]
+  buttons.forEach((button) => {
     const isVisible = !hidden.has(button.dataset.seriesToggle)
     button.setAttribute('aria-pressed', String(isVisible))
   })
   root.querySelectorAll('[data-series-path]').forEach((path) => {
     path.toggleAttribute('hidden', hidden.has(path.dataset.seriesPath))
   })
+  root.querySelectorAll('[data-series-panel]').forEach((panel) => {
+    panel.toggleAttribute('hidden', hidden.has(panel.dataset.seriesPanel))
+  })
+  const keys = new Set(buttons.map((button) => button.dataset.seriesToggle))
+  root.querySelectorAll('[data-series-show-all]').forEach((button) => {
+    button.disabled = ![...keys].some((key) => hidden.has(key))
+  })
+  applyTrendLayout(root)
   for (const state of applyChartInspection(root)) {
     if (Number.isFinite(state.domainX)) state.show(state.domainX)
   }
 }
 
+function updateSeriesSelection(root, selectedKey, isolate) {
+  const hidden = hiddenSeries()
+  const keys = [...root.querySelectorAll('[data-series-toggle]')]
+    .map((button) => button.dataset.seriesToggle)
+  if (isolate) {
+    for (const key of keys) {
+      if (key === selectedKey) hidden.delete(key)
+      else hidden.add(key)
+    }
+  } else if (selectedKey === '') {
+    for (const key of keys) hidden.delete(key)
+  } else if (hidden.has(selectedKey)) {
+    hidden.delete(selectedKey)
+  } else {
+    hidden.add(selectedKey)
+  }
+  saveHidden(hidden)
+  applySeriesVisibility()
+}
+
 if (typeof document !== 'undefined') {
   document.addEventListener('click', (event) => {
+    const layoutButton = event.target.closest('[data-trend-layout-value]')
+    if (layoutButton && workbench()?.contains(layoutButton)) {
+      saveTrendLayout(layoutButton.dataset.trendLayoutValue)
+      applyTrendLayout(workbench())
+      return
+    }
+    const showAllButton = event.target.closest('[data-series-show-all]')
+    if (showAllButton && workbench()?.contains(showAllButton)) {
+      updateSeriesSelection(workbench(), '', false)
+      return
+    }
     const button = event.target.closest('[data-series-toggle]')
     if (!button || !workbench()?.contains(button)) return
-    const hidden = hiddenSeries()
-    const key = button.dataset.seriesToggle
-    if (hidden.has(key)) hidden.delete(key)
-    else hidden.add(key)
-    saveHidden(hidden)
-    applySeriesVisibility()
+    updateSeriesSelection(workbench(), button.dataset.seriesToggle, false)
+  })
+  document.addEventListener('dblclick', (event) => {
+    const button = event.target.closest('[data-series-toggle]')
+    if (!button || !workbench()?.contains(button)) return
+    event.preventDefault()
+    updateSeriesSelection(workbench(), button.dataset.seriesToggle, true)
   })
 }

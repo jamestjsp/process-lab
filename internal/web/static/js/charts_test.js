@@ -133,11 +133,19 @@ const {
   inspectionIndexForKey,
   invertScale,
   nearestVertex,
+  normalizeTrendLayout,
   parsePathVertices,
   scaleValue,
   seriesValuesAtX,
   zoomedViewBox
 } = await import('./charts.js')
+
+test('normalizes trend layouts to the server-rendered overlay fallback', () => {
+  assert.equal(normalizeTrendLayout('split'), 'split')
+  assert.equal(normalizeTrendLayout('overlay'), 'overlay')
+  assert.equal(normalizeTrendLayout('unexpected'), 'overlay')
+  assert.equal(normalizeTrendLayout(null), 'overlay')
+})
 
 function seriesPath(key, name, pathData, hidden = false) {
   const path = new FakeElement('path', {

@@ -1713,6 +1713,81 @@ body.is-resizing-dock .studio-grid {
   gap: 10px;
 }
 
+.trend-workspace {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.trend-display-bar {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px 10px;
+  padding: 7px 9px;
+  border: 1px solid var(--sheet-line);
+  border-radius: var(--radius);
+  background: var(--sheet-card);
+}
+
+.trend-series-controls,
+.trend-view-controls {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.trend-series-controls {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.trend-series-controls .series-toggle {
+  flex: none;
+}
+
+.trend-view-controls button {
+  min-height: 26px;
+  padding: 3px 8px;
+  border: 1px solid var(--sheet-line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+  background: var(--sheet-card);
+  cursor: pointer;
+  font: 700 10px/1 var(--font-sans);
+}
+
+.trend-view-controls button:hover,
+.trend-view-controls button:focus-visible,
+.trend-view-controls button[aria-pressed="true"] {
+  border-color: var(--probe-mid);
+  color: var(--probe-deep);
+  background: var(--probe-glow);
+}
+
+.trend-view-controls button:disabled {
+  cursor: default;
+  opacity: .45;
+}
+
+.trend-interaction-hint {
+  grid-column: 1 / -1;
+  color: var(--ink-muted);
+  font-size: 9px;
+}
+
+.trend-split-grid {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.trend-panel-split .trend-chart {
+  height: 180px;
+}
+
 /* The chart SVG carries a fixed 780-unit viewBox, so its type shrinks
    with the panel. Holding a floor width keeps every label above 11px and
    lets the panel scroll rather than the page when space runs out. */

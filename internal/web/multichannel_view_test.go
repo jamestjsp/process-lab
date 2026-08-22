@@ -94,7 +94,17 @@ func TestChartViewUsesStableResultChannelKeysAndLabels(t *testing.T) {
 	if len(view.Paths) != 2 ||
 		view.Paths[0].Key != "7:0:0" ||
 		view.Paths[1].Key != "7:0:1" ||
-		view.Paths[0].Name != "Results · temperature" {
+		view.Paths[0].Name != "Results · temperature" ||
+		len(view.SplitPlots) != 2 {
 		t.Fatalf("chart paths = %#v", view.Paths)
+	}
+	for index, panel := range view.SplitPlots {
+		if panel.SeriesKey != view.Paths[index].Key ||
+			panel.Title != view.Paths[index].Name ||
+			panel.Plot.GroupID != "simulation" ||
+			len(panel.Paths) != 1 ||
+			panel.Paths[0].Key != view.Paths[index].Key {
+			t.Fatalf("split plot %d = %#v", index, panel)
+		}
 	}
 }
