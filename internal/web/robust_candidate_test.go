@@ -159,7 +159,7 @@ func robustCandidateAction(
 	t.Helper()
 	pattern := regexp.MustCompile(
 		`/flows/` + strconv.FormatInt(flowID, 10) +
-			`/controller-candidates/([0-9a-f]{32})/` + action,
+			`/controller-candidates/([0-9a-f]{32})/` + action + `\?view=design`,
 	)
 	match := pattern.FindStringSubmatch(body)
 	if len(match) != 2 {

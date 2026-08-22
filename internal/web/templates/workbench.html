@@ -10,12 +10,91 @@
   A <title> cannot go in the shared block: on the document path that block is
   rendered inside <body>, where a title element does not belong.
 */}}
+{{define "engineering-plot-data"}}data-engineering-plot
+  data-plot-id="{{.ID}}"
+  data-plot-group="{{.GroupID}}"
+  data-x-min="{{.XScale.DomainMin}}"
+  data-x-max="{{.XScale.DomainMax}}"
+  data-y-min="{{.YScale.DomainMin}}"
+  data-y-max="{{.YScale.DomainMax}}"
+  data-x-scale="{{.XScale.Kind}}"
+  data-y-scale="{{.YScale.Kind}}"
+  data-plot-left="{{.Rect.Left}}"
+  data-plot-right="{{.Rect.Right}}"
+  data-plot-top="{{.Rect.Top}}"
+  data-plot-bottom="{{.Rect.Bottom}}"{{end}}
+
+{{define "analysis-plot"}}
+<figure class="analysis-plot" tabindex="0" {{template "engineering-plot-data" .Plot}}>
+  <figcaption id="{{.Plot.ID}}-caption"><strong>{{.Title}}</strong><span>{{.YLabel}} / {{.XLabel}}</span></figcaption>
+  {{if .Paths}}
+  <div class="analysis-series-controls">
+    {{range .Paths}}{{if .Key}}<button type="button" class="series-toggle" data-series-toggle="{{.Key}}" aria-pressed="true"><i style="background:{{.Color}}"></i>{{.Name}}</button>{{end}}{{end}}
+  </div>
+  {{end}}
+  <div class="chart-tools" role="group" aria-label="{{.Title}} controls">
+    <button type="button" data-chart-characteristics aria-pressed="true">Characteristics</button>
+    <button type="button" data-chart-zoom-in>Zoom in</button>
+    <button type="button" data-chart-zoom-out>Zoom out</button>
+    <button type="button" data-chart-clear>Clear cursor</button>
+    <button type="button" data-chart-reset>Reset</button>
+  </div>
+  <svg viewBox="0 0 400 140" role="img" aria-labelledby="{{.Plot.ID}}-caption">
+    {{range .Plot.YTicks}}
+    <line x1="{{$.Plot.Rect.Left}}" x2="{{$.Plot.Rect.Right}}" y1="{{.Position}}" y2="{{.Position}}" class="chart-grid"></line>
+    <text x="{{$.Plot.Rect.Left}}" y="{{.Position}}" dx="-4" class="chart-label y-label">{{.Label}}</text>
+    {{end}}
+    {{range .Plot.XTicks}}
+    <line x1="{{.Position}}" x2="{{.Position}}" y1="{{$.Plot.Rect.Top}}" y2="{{$.Plot.Rect.Bottom}}" class="chart-grid chart-grid-x"></line>
+    <text x="{{.Position}}" y="{{$.Plot.Rect.Bottom}}" dy="12" class="chart-label x-label">{{.Label}}</text>
+    {{end}}
+    <g data-chart-characteristic-lines data-chart-characteristic>
+      {{range .Plot.References}}
+      <line x1="{{.X1}}" y1="{{.Y1}}" x2="{{.X2}}" y2="{{.Y2}}" class="chart-reference chart-reference-{{.Kind}}"></line>
+      {{if .Label}}{{if eq .X1 .X2}}<text x="{{.X1}}" y="{{.Y1}}" dx="3" dy="9" class="chart-reference-label">{{.Label}}</text>{{else}}<text x="{{.X1}}" y="{{.Y1}}" dx="3" dy="-3" class="chart-reference-label">{{.Label}}</text>{{end}}{{end}}
+      {{end}}
+    </g>
+    {{range .Paths}}
+    <path d="{{.D}}" fill="none" stroke="{{.Color}}"{{if .Dash}} stroke-dasharray="{{.Dash}}"{{end}} class="analysis-path"{{if .Key}} data-series-path="{{.Key}}" data-series-name="{{.Name}}"{{end}}></path>
+    {{end}}
+    {{range .Markers}}
+    <text x="{{.X}}" y="{{.Y}}" class="analysis-marker analysis-marker-{{.Kind}}">{{.Label}}</text>
+    {{end}}
+  </svg>
+  <output class="chart-readout" data-chart-readout aria-live="polite">Focus the plot, then use Left and Right arrows to inspect values.</output>
+</figure>
+{{end}}
+
+{{define "run-history"}}
+<section class="run-history" aria-labelledby="run-history-heading">
+  <header><div><span class="eyebrow">Stored evidence</span><h3 id="run-history-heading">Recent runs</h3></div><small>Newest first</small></header>
+  {{if .RecentRuns}}
+  <ol>
+    {{range .RecentRuns}}
+    <li{{if and $.Mode.Compare (eq .ID $.Comparison.BaselineID)}} class="is-baseline"{{end}}>
+      <div class="run-history-title"><strong>Run {{.ID}}</strong>{{if .Current}}<span>current</span>{{end}}{{if .Stale}}<span class="is-stale">stale</span>{{end}}<time>{{.Created}}</time></div>
+      <dl><div><dt>Duration</dt><dd>{{.Duration}}</dd></div><div><dt>Sample</dt><dd>{{.SampleTime}}</dd></div><div><dt>Channels</dt><dd>{{.ChannelCount}}</dd></div></dl>
+      <div class="run-history-actions">
+        <a href="{{.CSVPath}}">CSV</a>
+        {{if .Current}}<span>Current run</span>{{else}}
+        <a href="{{.CompareHref}}" hx-get="{{.CompareHTMX}}" hx-target="#workbench" hx-swap="outerHTML" hx-push-url="{{.CompareHref}}"{{if and $.Mode.Compare (eq .ID $.Comparison.BaselineID)}} aria-current="true"{{end}}>Use as baseline</a>
+        {{end}}
+      </div>
+    </li>
+    {{end}}
+  </ol>
+  {{else}}
+  <div class="analysis-empty"><strong>No stored runs</strong><p>Run a simulation to create an exportable comparison baseline.</p></div>
+  {{end}}
+</section>
+{{end}}
+
 {{define "workbench-fragment"}}{{if not .BoundedEdit}}<title>{{.Title}}</title>
 {{end}}
 {{template "workbench" .}}{{end}}
 
 {{define "workbench"}}
-<main id="workbench" class="workbench" data-flow-id="{{.Snapshot.Flow.ID}}" data-selected-id="{{if .Selected}}{{.Selected.ID}}{{end}}" data-rail-left="expanded" data-rail-right="expanded" data-dock="expanded">
+<main id="workbench" class="workbench" data-flow-id="{{.Snapshot.Flow.ID}}" data-workbench-mode="{{.Mode.Name}}" data-canonical-path="{{.Mode.CanonicalPath}}" data-selected-id="{{if .Selected}}{{.Selected.ID}}{{end}}" data-rail-left="expanded" data-rail-right="expanded" data-dock="expanded">
   <header class="topbar">
     <a class="brand" href="/" aria-label="Process Lab home">
       <span class="brand-mark"><i></i><i></i><i></i></span>
@@ -99,7 +178,7 @@
       </div>
       <div class="palette-list">
         {{range .Palette}}
-        <form hx-post="/flows/{{$.Snapshot.Flow.ID}}/blocks" hx-target="#workbench" hx-swap="outerHTML">
+        <form method="post" action="/flows/{{$.Snapshot.Flow.ID}}/blocks?view={{$.Mode.Name}}" hx-post="/flows/{{$.Snapshot.Flow.ID}}/blocks?view={{$.Mode.Name}}" hx-target="#workbench" hx-swap="outerHTML">
           <input type="hidden" name="kind" value="{{.Kind}}">
           <input type="hidden" name="x" value="{{.X}}">
           <input type="hidden" name="y" value="{{.Y}}">
@@ -215,108 +294,73 @@
               <span class="rail-chevron" aria-hidden="true">▾</span>
             </button>
             <div>
-              <span class="eyebrow">Numerical experiment</span>
-              <h2>Simulation output</h2>
+              <span class="eyebrow">Engineering workspace</span>
+              <h2>{{.Mode.Label}}</h2>
             </div>
           </div>
-          <form class="run-form" id="run-form" hx-post="/flows/{{.Snapshot.Flow.ID}}/simulations" hx-target="#workbench" hx-swap="outerHTML" hx-disabled-elt="button">
-            {{if .Selected}}<input type="hidden" name="selected_id" value="{{.Selected.ID}}">{{end}}
-            <label>Duration <span><input name="duration" type="number" min="{{.SimulationMinDuration}}" step="1" value="{{if .Chart.Present}}{{.Chart.Duration}}{{else}}20{{end}}"> s</span></label>
-            <label>Sample <span><input name="sample_time" type="number" min="{{.SimulationMinSample}}" step="{{.SimulationMinSample}}" value="{{if .Chart.Present}}{{.Chart.SampleTime}}{{else}}0.10{{end}}"> s</span></label>
-            <button class="run-button" type="submit">
-              <span class="run-icon">▶</span>
-              <span class="run-label">Run model</span>
-              <span class="htmx-indicator">Running…</span>
-            </button>
-            <a class="results-export" href="/flows/{{.Snapshot.Flow.ID}}/results.json">Export JSON</a>
-            <small class="run-limits">{{.SimulationLimits}}</small>
-          </form>
+          <nav class="workspace-modes" aria-label="Engineering workspace views">
+            {{range .Mode.Links}}
+            <a href="{{.Href}}" hx-get="{{.Fragment}}" hx-target="#workbench" hx-swap="outerHTML" hx-push-url="{{.Href}}"{{if .Active}} aria-current="page"{{end}}>{{.Label}}</a>
+            {{end}}
+          </nav>
         </header>
 
         <div class="dock-body">
-        {{if .Chart.Present}}
-        <div class="results-body">
-          <div class="visualization-stack">
-          {{if .Chart.Paths}}
-          <div class="trend-panel">
-            <div class="trend-legend">
-              {{range .Chart.Paths}}<button type="button" class="series-toggle" data-series-toggle="{{.Key}}" aria-pressed="true"><i style="background:{{.Color}}"></i>{{.Name}}</button>{{end}}
-              <small>Last run {{.Chart.CreatedAt}}</small>
-            </div>
-            <svg class="trend-chart" viewBox="0 0 780 228" role="img" aria-label="Simulation trend">
-              {{range .Chart.YGrid}}
-              <line x1="48" x2="762" y1="{{.Position}}" y2="{{.Position}}" class="chart-grid"></line>
-              <text x="40" y="{{.Position}}" class="chart-label y-label">{{.Label}}</text>
-              {{end}}
-              {{range .Chart.XGrid}}
-              <line x1="{{.Position}}" x2="{{.Position}}" y1="18" y2="196" class="chart-grid chart-grid-x"></line>
-              <text x="{{.Position}}" y="218" class="chart-label x-label">{{.Label}}</text>
-              {{end}}
-              {{range .Chart.Paths}}
-              <path d="{{.D}}" fill="none" stroke="{{.Color}}" class="trend-path" data-series-path="{{.Key}}"></path>
-              {{end}}
-              <text x="760" y="218" class="axis-title">seconds</text>
-            </svg>
-          </div>
-          {{end}}
-          {{range .Chart.Spectra}}
-          <div class="trend-panel spectrum-panel">
-            <div class="trend-legend">
-              <span><i style="background:#2a8f83"></i>{{.Name}}</span>
-              <small>Peak {{.PeakFrequency}} · amplitude {{.PeakMagnitude}}</small>
-            </div>
-            <svg class="trend-chart spectrum-chart" viewBox="0 0 780 190" role="img" aria-label="{{.Name}} frequency spectrum">
-              <line x1="48" x2="762" y1="160" y2="160" class="chart-grid"></line>
-              <line x1="48" x2="48" y1="18" y2="160" class="chart-grid"></line>
-              <text x="48" y="180" class="chart-label x-label">0</text>
-              <text x="762" y="180" class="chart-label x-label">{{.MaxFrequency}}</text>
-              <path d="{{.D}}" fill="none" stroke="#2a8f83" class="trend-path spectrum-path"></path>
-            </svg>
-          </div>
-          {{end}}
-          </div>
-          <div class="metric-panel">
-            {{range .Chart.Metrics}}
-            <article class="metric-card">
-              <span>{{.Name}}</span>
-              <strong>{{printf "%.3f" .Final}}</strong>
-              <dl>
-                <div><dt>Peak</dt><dd>{{printf "%.3f" .Peak}}</dd></div>
-                <div><dt>Settling</dt><dd>{{if .Settled}}{{printf "%.2f s" .SettleTime}}{{else}}not settled{{end}}</dd></div>
-              </dl>
-            </article>
+        {{if .Mode.Simulation}}
+        <section class="simulation-workspace" aria-labelledby="simulation-heading">
+          <header class="workspace-section-header">
+            <div><span class="eyebrow">Numerical experiment</span><h2 id="simulation-heading">Simulation output</h2></div>
+            <form class="run-form" id="run-form" method="post" action="/flows/{{.Snapshot.Flow.ID}}/simulations?view=simulation" hx-post="/flows/{{.Snapshot.Flow.ID}}/simulations?view=simulation" hx-target="#workbench" hx-swap="outerHTML" hx-disabled-elt="button">
+              {{if .Selected}}<input type="hidden" name="selected_id" value="{{.Selected.ID}}">{{end}}
+              <label>Duration <span><input name="duration" type="number" min="{{.SimulationMinDuration}}" step="1" value="{{if .Chart.Present}}{{.Chart.Duration}}{{else}}20{{end}}"> s</span></label>
+              <label>Sample <span><input name="sample_time" type="number" min="{{.SimulationMinSample}}" step="{{.SimulationMinSample}}" value="{{if .Chart.Present}}{{.Chart.SampleTime}}{{else}}0.10{{end}}"> s</span></label>
+              <button class="run-button" type="submit"><span class="run-icon">▶</span><span class="run-label">Run model</span><span class="htmx-indicator">Running…</span></button>
+              <a class="results-export" href="/flows/{{.Snapshot.Flow.ID}}/results.json">Export JSON</a>
+              <small class="run-limits">{{.SimulationLimits}}</small>
+            </form>
+          </header>
+          {{if .Chart.Present}}
+          <div class="results-body">
+            <div class="visualization-stack">
+            {{if .Chart.Paths}}
+            <figure class="trend-panel" tabindex="0" {{template "engineering-plot-data" .Chart.Plot}}>
+              <figcaption class="trend-legend" id="{{.Chart.Plot.ID}}-caption">
+                {{range .Chart.Paths}}<button type="button" class="series-toggle" data-series-toggle="{{.Key}}" aria-pressed="true"><i style="background:{{.Color}}"></i>{{.Name}}</button>{{end}}
+                <small>Last run {{.Chart.CreatedAt}}</small>
+              </figcaption>
+              <div class="chart-tools" role="group" aria-label="Simulation trend controls"><button type="button" data-chart-characteristics aria-pressed="true">Characteristics</button><button type="button" data-chart-zoom-in>Zoom in</button><button type="button" data-chart-zoom-out>Zoom out</button><button type="button" data-chart-clear>Clear cursor</button><button type="button" data-chart-reset>Reset</button></div>
+              <svg class="trend-chart" viewBox="0 0 780 228" role="img" aria-labelledby="{{.Chart.Plot.ID}}-caption">
+                {{range .Chart.YGrid}}<line x1="{{$.Chart.Plot.Rect.Left}}" x2="{{$.Chart.Plot.Rect.Right}}" y1="{{.Position}}" y2="{{.Position}}" class="chart-grid"></line><text x="40" y="{{.Position}}" class="chart-label y-label">{{.Label}}</text>{{end}}
+                {{range .Chart.XGrid}}<line x1="{{.Position}}" x2="{{.Position}}" y1="{{$.Chart.Plot.Rect.Top}}" y2="{{$.Chart.Plot.Rect.Bottom}}" class="chart-grid chart-grid-x"></line><text x="{{.Position}}" y="218" class="chart-label x-label">{{.Label}}</text>{{end}}
+                <g data-chart-characteristic-lines data-chart-characteristic>{{range .Chart.Plot.References}}<line x1="{{.X1}}" y1="{{.Y1}}" x2="{{.X2}}" y2="{{.Y2}}" class="chart-reference chart-reference-{{.Kind}}"></line>{{end}}</g>
+                {{range .Chart.Paths}}<path d="{{.D}}" fill="none" stroke="{{.Color}}"{{if .Dash}} stroke-dasharray="{{.Dash}}"{{end}} class="trend-path" data-series-path="{{.Key}}" data-series-name="{{.Name}}"></path>{{end}}
+                <text x="760" y="218" class="axis-title">seconds</text>
+              </svg>
+              <output class="chart-readout" data-chart-readout aria-live="polite">Focus the plot, then use Left and Right arrows to inspect values.</output>
+            </figure>
             {{end}}
-            <div class="solver-badge fidelity-card">
-              <span>SIMULATION FIDELITY</span>
-              <b>{{.Chart.Fidelity.Driver}}</b>
-              <dl>
-                <div><dt>Domain</dt><dd>{{.Chart.Fidelity.Domain}}</dd></div>
-                <div><dt>Base step</dt><dd>{{.Chart.Fidelity.BaseStep}}</dd></div>
-                <div><dt>Segments</dt><dd>{{.Chart.Fidelity.Segments}}</dd></div>
-                <div><dt>Source hold</dt><dd>{{.Chart.Fidelity.SourceHold}}</dd></div>
-              </dl>
-              {{range .Chart.Fidelity.Delays}}<small class="fidelity-item"><strong>Delay</strong>{{.}}</small>{{end}}
-              {{range .Chart.Fidelity.Rates}}<small class="fidelity-item"><strong>Rate</strong>{{.}}</small>{{end}}
-              <small class="fidelity-note">{{.Chart.Fidelity.Note}}</small>
-              <small class="engine-label">controlsys + Gonum FFT</small>
+            {{range .Chart.Spectra}}
+            <div class="trend-panel spectrum-panel"><div class="trend-legend"><span><i style="background:#2a8f83"></i>{{.Name}}</span><small>Peak {{.PeakFrequency}} · amplitude {{.PeakMagnitude}}</small></div><svg class="trend-chart spectrum-chart" viewBox="0 0 780 190" role="img" aria-label="{{.Name}} frequency spectrum"><line x1="48" x2="762" y1="160" y2="160" class="chart-grid"></line><line x1="48" x2="48" y1="18" y2="160" class="chart-grid"></line><text x="48" y="180" class="chart-label x-label">0</text><text x="762" y="180" class="chart-label x-label">{{.MaxFrequency}}</text><path d="{{.D}}" fill="none" stroke="#2a8f83" class="trend-path spectrum-path"></path></svg></div>
+            {{end}}
+            </div>
+            <div class="metric-panel">
+              {{range .Chart.Metrics}}<article class="metric-card"><span>{{.Name}}</span><strong>{{printf "%.3f" .Final}}</strong><dl><div><dt>Peak</dt><dd>{{printf "%.3f" .Peak}}</dd></div><div><dt>Settling</dt><dd>{{if .Settled}}{{printf "%.2f s" .SettleTime}}{{else}}not settled{{end}}</dd></div></dl></article>{{end}}
+              <div class="solver-badge fidelity-card"><span>SIMULATION FIDELITY</span><b>{{.Chart.Fidelity.Driver}}</b><dl><div><dt>Domain</dt><dd>{{.Chart.Fidelity.Domain}}</dd></div><div><dt>Base step</dt><dd>{{.Chart.Fidelity.BaseStep}}</dd></div><div><dt>Segments</dt><dd>{{.Chart.Fidelity.Segments}}</dd></div><div><dt>Source hold</dt><dd>{{.Chart.Fidelity.SourceHold}}</dd></div></dl>{{range .Chart.Fidelity.Delays}}<small class="fidelity-item"><strong>Delay</strong>{{.}}</small>{{end}}{{range .Chart.Fidelity.Rates}}<small class="fidelity-item"><strong>Rate</strong>{{.}}</small>{{end}}<small class="fidelity-note">{{.Chart.Fidelity.Note}}</small><small class="engine-label">controlsys + Gonum FFT</small></div>
             </div>
           </div>
-        </div>
-        {{else}}
-        <div class="empty-results">
-          <span class="empty-wave">⌁</span>
-          <div><strong>No run yet</strong><p>Wire the model, then run a time-domain simulation.</p></div>
-          <span class="empty-arrow">→</span>
-        </div>
-        {{end}}
-
+          {{else}}
+          <div class="empty-results"><span class="empty-wave">⌁</span><div><strong>No run yet</strong><p>Wire the model, then run a time-domain simulation.</p></div><span class="empty-arrow">→</span></div>
+          {{end}}
+          {{template "run-history" .}}
+        </section>
+        {{else if .Mode.Design}}
         {{template "controller-design" .}}
-
+        {{else if .Mode.Analysis}}
         <section class="analysis-workspace" aria-labelledby="analysis-heading">
           <header class="analysis-header">
             <div>
               <span class="eyebrow">Named-channel toolbox</span>
-              <h2 id="analysis-heading">Control analysis</h2>
+              <h2 id="analysis-heading">{{.Mode.Label}} analysis</h2>
               <p>Revision {{.Analysis.Revision}} · controlsys model response</p>
             </div>
             {{if .Analysis.Stale}}
@@ -328,19 +372,14 @@
           <form
             class="analysis-form"
             id="analysis-form"
-            hx-post="/flows/{{.Snapshot.Flow.ID}}/analyses"
+            method="post"
+            action="/flows/{{.Snapshot.Flow.ID}}/analyses?view={{.Mode.Name}}"
+            hx-post="/flows/{{.Snapshot.Flow.ID}}/analyses?view={{.Mode.Name}}"
             hx-target="#workbench"
             hx-swap="outerHTML"
             hx-disabled-elt="button">
             {{if .Selected}}<input type="hidden" name="selected_id" value="{{.Selected.ID}}">{{end}}
-            <label>
-              <span>Analysis</span>
-              <select name="analysis_intent">
-                <option value="dynamics">Dynamics + step</option>
-                <option value="frequency">Frequency response</option>
-                <option value="loop">Loop robustness</option>
-              </select>
-            </label>
+            <input type="hidden" name="analysis_intent" value="{{.Mode.Name}}">
             <label class="analysis-channel-field">
               <span>Named input</span>
               <select name="analysis_input">
@@ -361,18 +400,8 @@
               <span>Base step</span>
               <input name="analysis_base_step" type="number" min="0" step=".01" placeholder="auto">
             </label>
-            <label>
-              <span>Step horizon · 0 skips</span>
-              <input name="analysis_horizon" type="number" min="0" max="120" step=".1" value="10">
-            </label>
-            <label>
-              <span>Freq points</span>
-              <input name="analysis_points" type="number" min="2" max="2000" step="1" value="200">
-            </label>
-            <label class="analysis-all-channels">
-              <input name="analysis_all_channels" type="checkbox" value="true">
-              <span>All named channels for frequency analysis</span>
-            </label>
+            {{if eq .Mode.Name "dynamics"}}<label><span>Step horizon · 0 skips</span><input name="analysis_horizon" type="number" min="0" max="120" step=".1" value="10"></label>{{end}}
+            {{if eq .Mode.Name "frequency"}}<label><span>Freq points</span><input name="analysis_points" type="number" min="2" max="2000" step="1" value="200"></label><label class="analysis-all-channels"><input name="analysis_all_channels" type="checkbox" value="true"><span>All named channels</span></label>{{end}}
             <button class="run-button analysis-run-button" type="submit">
               <span class="run-icon">⌁</span>
               <span class="run-label">Analyze</span>
@@ -413,26 +442,7 @@
 
               {{if .Plots}}
               <div class="analysis-plots">
-                {{range .Plots}}
-                <figure class="analysis-plot">
-                  <figcaption><strong>{{.Title}}</strong><span>{{.YLabel}} / {{.XLabel}}</span></figcaption>
-                  {{if .Paths}}
-                  <div class="analysis-series-controls">
-                    {{range .Paths}}{{if .Key}}<button type="button" class="series-toggle" data-series-toggle="{{.Key}}" aria-pressed="true"><i style="background:{{.Color}}"></i>{{.Name}}</button>{{end}}{{end}}
-                  </div>
-                  {{end}}
-                  <svg viewBox="0 0 400 140" role="img" aria-label="{{.Title}}">
-                    <line x1="18" x2="390" y1="124" y2="124" class="analysis-axis"></line>
-                    <line x1="18" x2="18" y1="10" y2="124" class="analysis-axis"></line>
-                    {{range .Paths}}
-                    <path d="{{.D}}" fill="none" stroke="{{.Color}}" class="analysis-path"{{if .Key}} data-series-path="{{.Key}}"{{end}}></path>
-                    {{end}}
-                    {{range .Markers}}
-                    <text x="{{.X}}" y="{{.Y}}" class="analysis-marker analysis-marker-{{.Kind}}">{{.Label}}</text>
-                    {{end}}
-                  </svg>
-                </figure>
-                {{end}}
+                {{range .Plots}}{{template "analysis-plot" .}}{{end}}
               </div>
               {{end}}
 
@@ -451,6 +461,16 @@
           </div>
           {{end}}
         </section>
+        {{else if .Mode.Compare}}
+        <section class="comparison-workspace" aria-labelledby="comparison-heading">
+          <header class="analysis-header"><div><span class="eyebrow">Run evidence</span><h2 id="comparison-heading">Baseline comparison</h2>{{if .Comparison.BaselineID}}<p>Current run {{.Comparison.CurrentID}} · baseline run {{.Comparison.BaselineID}}</p>{{end}}</div></header>
+          {{if .Comparison.Warning}}<p class="comparison-warning" role="status">{{.Comparison.Warning}}</p>{{end}}
+          {{if .Comparison.Message}}<div class="analysis-empty"><strong>Comparison unavailable</strong><p>{{.Comparison.Message}}</p></div>{{end}}
+          {{if .Comparison.Plots}}<div class="analysis-plots comparison-plots">{{range .Comparison.Plots}}{{template "analysis-plot" .}}{{end}}</div>{{end}}
+          {{if .Comparison.Unmatched}}<section class="comparison-unmatched" aria-labelledby="unmatched-heading"><h3 id="unmatched-heading">Unmatched channels</h3><ul>{{range .Comparison.Unmatched}}<li>{{.}}</li>{{end}}</ul></section>{{end}}
+          {{template "run-history" .}}
+        </section>
+        {{end}}
         </div>
       </section>
     </section>
@@ -471,7 +491,7 @@
         </div>
         <span class="object-id">#{{.Selected.ID}}</span>
       </div>
-      <form class="property-form" hx-put="/blocks/{{.Selected.ID}}" hx-target="#workbench" hx-swap="outerHTML">
+      <form class="property-form" hx-put="/blocks/{{.Selected.ID}}?view={{.Mode.Name}}" hx-target="#workbench" hx-swap="outerHTML">
         <label>
           <span>Block name</span>
           <input type="text" name="name" value="{{.Selected.Name}}" maxlength="48" required>
@@ -526,7 +546,7 @@
             <span class="signal-peer"><strong>{{.OtherName}}</strong><small>{{.PortName}}</small></span>
             <button
               type="button"
-              hx-delete="/connections/{{.ID}}?selected={{$.Selected.ID}}"
+              hx-delete="/connections/{{.ID}}?selected={{$.Selected.ID}}&amp;view={{$.Mode.Name}}"
               hx-target="#workbench"
               hx-swap="outerHTML"
               hx-confirm="Remove this signal connection?"
@@ -542,7 +562,7 @@
       <button
         class="delete-button"
         type="button"
-        hx-delete="/blocks/{{.Selected.ID}}"
+        hx-delete="/blocks/{{.Selected.ID}}?view={{.Mode.Name}}"
         hx-target="#workbench"
         hx-swap="outerHTML"
         hx-confirm="Delete {{.Selected.Name}} and its signal wires?">

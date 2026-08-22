@@ -47,6 +47,7 @@
 
   <div class="tab-tools">
     <form class="tab-add-form" method="post" action="/projects/{{.Workspace.Project.ID}}/flows">
+      <input type="hidden" name="view" value="{{.Mode.Name}}">
       <button class="tab-add" type="submit" title="New flowsheet" aria-label="New flowsheet">+</button>
     </form>
     <details class="tab-jump">

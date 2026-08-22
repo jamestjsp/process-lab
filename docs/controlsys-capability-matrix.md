@@ -49,6 +49,14 @@ Status meanings:
 | H2 and H∞ synthesis | **Browser** | Named exogenous, regulated, measurement, and control partitions derive from control roles. The browser uses the shared read-only review, atomic apply, and one-use undo lifecycle. |
 | CARE/DARE, Lyapunov equations, Gramians, staircase forms, canonical transforms, balancing transforms, and state permutations | **Non-goal** | These are numerical building blocks. Product workflows expose the control-design, diagnosis, or reduction intent and retain the relevant evidence instead of exposing raw coordinate operations. |
 
+The browser presents these workflows as focused Simulation, Design, Dynamics,
+Frequency, Loop, and Compare modes. Analysis plots retain real engineering
+domains, including logarithmic angular-frequency axes, and expose keyboard and
+pointer inspection over server-rendered ticks and references. Simulation runs
+remain available as bounded history, per-run CSV evidence, and identity-matched
+baseline overlays and differences; historical baselines are labeled rather
+than discarded after a model revision.
+
 ## Identification, nonlinear, reduction, and model families
 
 | controlsys family | Status | Process Lab workflow and evidence |

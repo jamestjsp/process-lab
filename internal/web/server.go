@@ -63,7 +63,9 @@ func New(studioService *studio.Studio) (*Server, error) {
 	server.apiMux.Handle("GET /flows/{flowID}/document", server.api(server.flowDocumentDumpAPI))
 	server.apiMux.Handle("PUT /flows/{flowID}/document", server.api(server.flowDocumentApplyAPI))
 	server.apiMux.Handle("POST /flows/{flowID}/simulations", server.api(server.simulationRunAPI))
+	server.apiMux.Handle("GET /flows/{flowID}/simulations", server.api(server.simulationHistoryAPI))
 	server.apiMux.Handle("GET /flows/{flowID}/simulations/latest", server.api(server.simulationShowAPI))
+	server.apiMux.Handle("GET /flows/{flowID}/simulations/{runID}", server.api(server.simulationRunShowAPI))
 	server.apiMux.Handle("POST /flows/{flowID}/parameter-sweeps", server.api(server.parameterSweepRunAPI))
 	server.apiMux.Handle("POST /identifications/estimate", server.api(server.identificationEstimateAPI))
 	server.apiMux.Handle("POST /identifications/era", server.api(server.identificationERAAPI))
@@ -124,6 +126,7 @@ func New(studioService *studio.Studio) (*Server, error) {
 	mux.HandleFunc("DELETE /connections/{connectionID}", server.disconnect)
 	mux.HandleFunc("DELETE /blocks/{blockID}/connections", server.disconnectBlock)
 	mux.HandleFunc("POST /flows/{flowID}/simulations", server.runSimulation)
+	mux.HandleFunc("GET /flows/{flowID}/simulations/{runFile}", server.simulationCSV)
 	mux.HandleFunc("POST /flows/{flowID}/analyses", server.runAnalysis)
 	mux.HandleFunc("GET /flows/{flowID}/control-roles", server.getControlRoles)
 	mux.HandleFunc("PUT /flows/{flowID}/control-roles", server.assignControlRoles)
@@ -198,7 +201,19 @@ func (s *Server) projectFlowPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Process Lab could not load the flowsheet.", http.StatusInternalServerError)
 		return
 	}
-	view := pageView{Workbench: s.newWorkbenchView(workspace, selectedID(r), "")}
+	rawMode := strings.TrimSpace(r.URL.Query().Get("view"))
+	if _, valid := parseWorkbenchMode(rawMode); rawMode == "" || !valid {
+		http.Redirect(w, r, workbenchDocumentPath(
+			projectID, flowID, workbenchModeSimulation, "",
+		), http.StatusSeeOther)
+		return
+	}
+	workbench, err := s.requestWorkbenchView(r, workspace, selectedID(r), "")
+	if err != nil {
+		http.Error(w, "Process Lab could not load the engineering workspace.", http.StatusInternalServerError)
+		return
+	}
+	view := pageView{Workbench: workbench}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "page", view); err != nil {
 		http.Error(w, "Process Lab could not render the page.", http.StatusInternalServerError)
@@ -219,7 +234,9 @@ func (s *Server) projectPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Process Lab could not load the project.", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, workspacePath(workspace), http.StatusSeeOther)
+	http.Redirect(w, r, workbenchDocumentPath(
+		workspace.Project.ID, workspace.Snapshot.Flow.ID, workbenchModeSimulation, "",
+	), http.StatusSeeOther)
 }
 
 func (s *Server) workbench(w http.ResponseWriter, r *http.Request) {
@@ -284,9 +301,12 @@ func (s *Server) renameFlow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.templates.ExecuteTemplate(w, "workbench-fragment", s.newWorkbenchView(
-		workspace, selectedID(r), "",
-	)); err != nil {
+	view, err := s.requestWorkbenchView(r, workspace, selectedID(r), "")
+	if err != nil {
+		http.Error(w, "Process Lab could not load the engineering workspace.", http.StatusInternalServerError)
+		return
+	}
+	if err := s.templates.ExecuteTemplate(w, "workbench-fragment", view); err != nil {
 		http.Error(w, "Process Lab could not render the workbench.", http.StatusInternalServerError)
 	}
 }
@@ -710,7 +730,11 @@ func (s *Server) renderWorkbenchResponse(
 		return
 	}
 	workspace.Snapshot = snapshot
-	view := s.newWorkbenchView(workspace, selected, message)
+	view, err := s.requestWorkbenchView(r, workspace, selected, message)
+	if err != nil {
+		http.Error(w, "Process Lab could not load the engineering workspace.", http.StatusInternalServerError)
+		return
+	}
 	view.BoundedEdit = boundedEdit
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if boundedEdit {
@@ -725,7 +749,10 @@ func (s *Server) renderWorkbenchResponse(
 }
 
 func (s *Server) redirectWorkspace(w http.ResponseWriter, r *http.Request, workspace studio.Workspace) {
-	location := workspacePath(workspace)
+	location := workbenchDocumentPath(
+		workspace.Project.ID, workspace.Snapshot.Flow.ID,
+		workbenchModeFromRequest(r), "",
+	)
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Redirect", location)
 		w.WriteHeader(http.StatusNoContent)

@@ -310,7 +310,11 @@ func TestWorkbenchRendersNamedVectorPortWidth(t *testing.T) {
 // `/` no longer leads to it.
 func TestWorkbenchPageRendersTheShell(t *testing.T) {
 	server, _ := openTestServer(t)
-	response := request(t, server, http.MethodGet, "/projects/1/flows/1", nil)
+	canonical := request(t, server, http.MethodGet, "/projects/1/flows/1", nil)
+	if canonical.Code != http.StatusSeeOther || canonical.Header().Get("Location") != "/projects/1/flows/1?view=simulation" {
+		t.Fatalf("canonical redirect = %d %q", canonical.Code, canonical.Header().Get("Location"))
+	}
+	response := request(t, server, http.MethodGet, "/projects/1/flows/1?view=simulation", nil)
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d", response.Code)
 	}
@@ -323,7 +327,7 @@ func TestWorkbenchPageRendersTheShell(t *testing.T) {
 		"Feed setpoint",
 		`href="/assets/tokens.css"`,
 		`id="workbench"`,
-		`hx-post="/flows/1/blocks"`,
+		`hx-post="/flows/1/blocks?view=simulation"`,
 		`src="/assets/htmx-2.0.10.min.js"`,
 	} {
 		if !strings.Contains(body, expected) {
@@ -442,7 +446,7 @@ func TestTopbarOffersTheRegisterAndTheProjectSwitcher(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	body := request(t, server, http.MethodGet, "/projects/1/flows/1", nil).Body.String()
+	body := request(t, server, http.MethodGet, "/projects/1/flows/1?view=simulation", nil).Body.String()
 	end := strings.Index(body, `<div class="studio-grid">`)
 	if end < 0 {
 		t.Fatalf("no studio grid in the page: %s", body)
@@ -572,7 +576,7 @@ func TestCatalogPaletteAndTransferFunctionEditor(t *testing.T) {
 	server, service := openTestServer(t)
 	// The workbench directly: `/` is the register now, and reading a Location
 	// off a 200 would hand httptest.NewRequest an empty URL, which panics.
-	page := request(t, server, http.MethodGet, "/projects/1/flows/1", nil)
+	page := request(t, server, http.MethodGet, "/projects/1/flows/1?view=simulation", nil)
 	for _, expected := range []string{
 		"Constant", "Sine Wave", "Integrator", "Transfer Function",
 		"PID Controller", "Transport Delay", "Spectrum Analyzer",
@@ -838,12 +842,12 @@ func TestAnalysisWorkspaceRetainsResultsAndMarksModelEditsStale(t *testing.T) {
 		"analysis_points":    {"40"},
 		"analysis_base_step": {"0.1"},
 	}
-	response := request(t, server, http.MethodPost, "/flows/1/analyses", values)
+	response := request(t, server, http.MethodPost, "/flows/1/analyses?view=dynamics", values)
 	if response.Code != http.StatusOK {
 		t.Fatalf("dynamics status = %d, body = %s", response.Code, response.Body.String())
 	}
 	for _, expected := range []string{
-		"Control analysis", "Dynamics &amp; time", "Step response",
+		"Dynamics analysis", "Dynamics &amp; time", "Step response",
 		"Pole-zero map", "CURRENT",
 	} {
 		if !strings.Contains(response.Body.String(), expected) {
@@ -852,12 +856,12 @@ func TestAnalysisWorkspaceRetainsResultsAndMarksModelEditsStale(t *testing.T) {
 	}
 
 	values.Set("analysis_intent", "frequency")
-	response = request(t, server, http.MethodPost, "/flows/1/analyses", values)
+	response = request(t, server, http.MethodPost, "/flows/1/analyses?view=frequency", values)
 	if response.Code != http.StatusOK {
 		t.Fatalf("frequency status = %d, body = %s", response.Code, response.Body.String())
 	}
 	for _, expected := range []string{
-		"Dynamics &amp; time", "Frequency response", "Bode magnitude",
+		"Frequency analysis", "Frequency response", "Bode magnitude",
 		"Nyquist", "Nichols", "Singular values",
 	} {
 		if !strings.Contains(response.Body.String(), expected) {
@@ -874,7 +878,7 @@ func TestAnalysisWorkspaceRetainsResultsAndMarksModelEditsStale(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	response = request(t, server, http.MethodGet, "/projects/1/flows/1", nil)
+	response = request(t, server, http.MethodGet, "/projects/1/flows/1?view=frequency", nil)
 	if response.Code != http.StatusOK {
 		t.Fatalf("edited workspace status = %d", response.Code)
 	}
@@ -898,7 +902,7 @@ func TestDynamicsAnalysisCanSkipStepExperimentThroughHTTP(t *testing.T) {
 	channel := func(block studio.Block) string {
 		return fmt.Sprintf("%d:0:0", block.ID)
 	}
-	response := request(t, server, http.MethodPost, "/flows/1/analyses", url.Values{
+	response := request(t, server, http.MethodPost, "/flows/1/analyses?view=dynamics", url.Values{
 		"analysis_intent":  {"dynamics"},
 		"analysis_input":   {channel(source)},
 		"analysis_output":  {channel(plant)},
@@ -1234,7 +1238,7 @@ func TestPageLoadsTheCanvasEntryPointAsAModule(t *testing.T) {
 	if strings.Contains(body, "/assets/js/") {
 		t.Error("the workbench fragment loads scripts; only the page shell should")
 	}
-	page := request(t, server, http.MethodGet, "/projects/1/flows/1", nil).Body.String()
+	page := request(t, server, http.MethodGet, "/projects/1/flows/1?view=simulation", nil).Body.String()
 	if !strings.Contains(page, `<script type="module" src="/assets/js/main.js"></script>`) {
 		t.Error("the page does not load the canvas entry point as a module")
 	}
@@ -1251,7 +1255,7 @@ func TestPageLoadsTheCanvasEntryPointAsAModule(t *testing.T) {
 
 func TestPagesRemoveHTMXSettleDelay(t *testing.T) {
 	server, _ := openTestServer(t)
-	for _, path := range []string{"/", "/projects/1/flows/1"} {
+	for _, path := range []string{"/", "/projects/1/flows/1?view=simulation"} {
 		body := request(t, server, http.MethodGet, path, nil).Body.String()
 		config := strings.Index(body, `<meta name="htmx-config" content='{"defaultSettleDelay":0}'>`)
 		htmx := strings.Index(body, `<script src="/assets/htmx-2.0.10.min.js"></script>`)
