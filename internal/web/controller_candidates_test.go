@@ -255,7 +255,7 @@ func TestPIDCandidateReviewApplyAndUndoThroughHTMX(t *testing.T) {
 	applied := requestHX(
 		t, server, http.MethodPost,
 		"/flows/"+strconv.FormatInt(flowID, 10)+
-			"/controller-candidates/"+pending.ID+"/apply",
+			"/controller-candidates/"+pending.ID+"/apply?view=design",
 		nil,
 	)
 	if applied.Code != http.StatusOK {
@@ -292,7 +292,7 @@ func TestPIDCandidateReviewApplyAndUndoThroughHTMX(t *testing.T) {
 	undone := requestHX(
 		t, server, http.MethodPost,
 		"/flows/"+strconv.FormatInt(flowID, 10)+
-			"/controller-candidates/"+pending.ID+"/undo",
+			"/controller-candidates/"+pending.ID+"/undo?view=design",
 		nil,
 	)
 	if undone.Code != http.StatusOK {
@@ -349,7 +349,7 @@ func TestPID2CandidateWeightsApplyAndUndoThroughHTMX(t *testing.T) {
 	applied := requestHX(
 		t, server, http.MethodPost,
 		"/flows/"+strconv.FormatInt(flowID, 10)+
-			"/controller-candidates/"+pending.ID+"/apply",
+			"/controller-candidates/"+pending.ID+"/apply?view=design",
 		nil,
 	)
 	if applied.Code != http.StatusOK {
@@ -367,7 +367,7 @@ func TestPID2CandidateWeightsApplyAndUndoThroughHTMX(t *testing.T) {
 	undone := requestHX(
 		t, server, http.MethodPost,
 		"/flows/"+strconv.FormatInt(flowID, 10)+
-			"/controller-candidates/"+pending.ID+"/undo",
+			"/controller-candidates/"+pending.ID+"/undo?view=design",
 		nil,
 	)
 	if undone.Code != http.StatusOK {
@@ -426,7 +426,7 @@ func TestLQGCandidateReviewAndApplyThroughHTMX(t *testing.T) {
 	applied := requestHX(
 		t, server, http.MethodPost,
 		"/flows/"+strconv.FormatInt(flowID, 10)+
-			"/controller-candidates/"+pending.ID+"/apply",
+			"/controller-candidates/"+pending.ID+"/apply?view=design",
 		nil,
 	)
 	if applied.Code != http.StatusOK {
@@ -446,7 +446,7 @@ func TestLQGCandidateReviewAndApplyThroughHTMX(t *testing.T) {
 	undone := requestHX(
 		t, server, http.MethodPost,
 		"/flows/"+strconv.FormatInt(flowID, 10)+
-			"/controller-candidates/"+pending.ID+"/undo",
+			"/controller-candidates/"+pending.ID+"/undo?view=design",
 		nil,
 	)
 	if undone.Code != http.StatusOK {
@@ -464,11 +464,11 @@ func TestLQGCandidateReviewAndApplyThroughHTMX(t *testing.T) {
 func TestRobustSynthesisIsAvailableThroughTheControllerWorkspace(t *testing.T) {
 	server, _ := openTestServer(t)
 	page := request(
-		t, server, http.MethodGet, "/projects/1/flows/1", nil,
+		t, server, http.MethodGet, "/projects/1/flows/1?view=design", nil,
 	)
 	for _, expected := range []string{
 		`id="robust-controller-design-form"`,
-		`action="/flows/1/controller-candidates/robust"`,
+		`action="/flows/1/controller-candidates/robust?view=design"`,
 		`<option value="h2">H2</option>`,
 		`<option value="hinf">H∞</option>`,
 	} {

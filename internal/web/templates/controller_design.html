@@ -13,8 +13,8 @@
       class="analysis-form"
       id="pid-controller-design-form"
       method="post"
-      action="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/pid"
-      hx-post="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/pid"
+      action="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/pid?view=design"
+      hx-post="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/pid?view=design"
       hx-target="#controller-candidate"
       hx-swap="innerHTML"
       hx-disabled-elt="button">
@@ -45,8 +45,8 @@
       class="analysis-form"
       id="state-controller-design-form"
       method="post"
-      action="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/state-space"
-      hx-post="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/state-space"
+      action="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/state-space?view=design"
+      hx-post="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/state-space?view=design"
       hx-target="#controller-candidate"
       hx-swap="innerHTML"
       hx-disabled-elt="button">
@@ -67,8 +67,8 @@
       class="analysis-form"
       id="robust-controller-design-form"
       method="post"
-      action="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/robust"
-      hx-post="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/robust"
+      action="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/robust?view=design"
+      hx-post="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/robust?view=design"
       hx-target="#controller-candidate"
       hx-swap="innerHTML"
       hx-disabled-elt="button">
@@ -153,19 +153,7 @@
 
   {{if .Plots}}
   <div class="analysis-plots">
-    {{range .Plots}}
-    <figure class="analysis-plot">
-      <figcaption><strong>{{.Title}}</strong><span>{{.YLabel}} / {{.XLabel}}</span></figcaption>
-      <svg viewBox="0 0 400 140" role="img" aria-label="{{.Title}}">
-        <line x1="18" x2="390" y1="124" y2="124" class="analysis-axis"></line>
-        <line x1="18" x2="18" y1="10" y2="124" class="analysis-axis"></line>
-        {{range .Paths}}<path d="{{.D}}" fill="none" stroke="{{.Color}}" class="analysis-path"></path>{{end}}
-      </svg>
-      <div class="analysis-series-controls">
-        {{range .Paths}}<span class="series-toggle"><i style="background:{{.Color}}"></i>{{.Name}}</span>{{end}}
-      </div>
-    </figure>
-    {{end}}
+    {{range .Plots}}{{template "analysis-plot" .}}{{end}}
   </div>
   {{end}}
 

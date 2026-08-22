@@ -183,9 +183,14 @@ func (s *Server) renderWorkspace(
 	selected int64,
 	message string,
 ) {
+	view, err := s.requestWorkbenchView(r, workspace, selected, message)
+	if err != nil {
+		http.Error(w, "Process Lab could not load the engineering workspace.", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(
-		w, "workbench-fragment", s.newWorkbenchView(workspace, selected, message),
+		w, "workbench-fragment", view,
 	); err != nil {
 		http.Error(w, "Process Lab could not render the workbench.", http.StatusInternalServerError)
 	}

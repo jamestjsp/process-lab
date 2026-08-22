@@ -128,6 +128,30 @@ A tab carries an amber dot when its model changed since its last simulation.
 That is the same condition the simulation dock uses to call a chart stale, so
 the tab and the chart cannot disagree.
 
+The dock is a focused engineering workspace with canonical, copyable modes:
+**Simulation**, **Design**, **Dynamics**, **Frequency**, **Loop**, and
+**Compare**. The selected mode lives in the `?view=` query, so ordinary links,
+reloads, browser history, and HTMX swaps reproduce the same view. Design keeps
+the controller candidate review, apply, and undo workflow separate from the
+analysis views.
+
+Simulation and analysis plots render server-owned linear or logarithmic axes,
+engineering tick labels, grids, and applicable reference lines. Move the
+pointer across a plot or focus it and use `Left`, `Right`, `Home`, and `End` to
+inspect rendered values; `Escape` clears a linked cursor. Bode magnitude and
+phase share their frequency cursor. The plot toolbar can show or hide
+characteristics, zoom from 100% to 400%, clear the cursor, or reset the view.
+Series controls remain keyed to stable channel identities across HTMX swaps.
+
+Simulation keeps a bounded newest-first run history. Every stored run offers a
+CSV attachment whose columns identify block, port, and channel. Compare uses
+the newest current-model run against an older selected baseline, matches
+channels by that identity tuple, overlays current and dashed baseline traces,
+interpolates the baseline onto the current time grid for a difference plot,
+and lists unmatched channels. A baseline from an older model revision remains
+valid historical evidence and is labeled with a warning; a stale current run
+must be rerun before comparison.
+
 The topbar carries **Projects**, a link back to the register, and a switcher
 naming the open project that lists the others and creates a new one. The
 flowsheets of the open project are the tab strip's subject and are not repeated
@@ -380,12 +404,12 @@ sampled passivity pass is never presented as an analytic certificate.
 `Studio.RunAnalysis` is the workbench boundary for those analysis intents. It
 owns the snapshot, named-channel selection, calculation, persisted latest
 result per intent, and revision comparison. Dynamics, frequency, and loop
-results remain side by side across restarts; a model edit keeps them visible
-but marks them stale, while a layout-only move leaves their model revision
-current. Frequency analysis can select every named input and output, rendering
-each deterministic `output ← input` Bode magnitude and phase trace plus MIMO
-singular values. Legend controls hide or show the same stable trace key across
-HTMX swaps.
+results persist independently across restarts and are shown in their focused
+workbench modes; a model edit keeps them visible but marks them stale, while a
+layout-only move leaves their model revision current. Frequency analysis can
+select every named input and output, rendering each deterministic
+`output ← input` Bode magnitude and phase trace plus MIMO singular values.
+Legend controls hide or show the same stable trace key across HTMX swaps.
 
 `Studio.AssignControlRoles` persists an explicit, versioned control-model
 contract rather than inferring a plant or controller from canvas topology.
@@ -432,8 +456,11 @@ ordering through JSON persistence, rendering, and export instead of relying on
 slice position. A run is bounded to 5,000 samples and 16 plotted channels;
 frequency analysis is bounded to 2,000 points and 64 input-output traces.
 `/flows/{id}/results.json` exports the versioned latest simulation and all
-three latest analysis intents. Duplicating a flowsheet deliberately copies the
-model but not old results, because the new sheet has not been evaluated.
+three latest analysis intents. The bounded simulation-history API exposes
+stored run summaries and exact flow-owned run records, while
+`/flows/{id}/simulations/{run-id}.csv` exports one run. Duplicating a flowsheet
+deliberately copies the model but not old results, because the new sheet has
+not been evaluated.
 
 Named vector routing is explicit diagram algebra. Mux assembles scalar ports
 into one named vector; Demux decomposes it; Selector emits a validated named
@@ -463,7 +490,7 @@ The database stores:
   uniqueness, and a domain rule that each target port accepts one wire;
 - recent activity events;
 - complete simulation runs as identity-keyed JSON time series;
-- the latest dynamics, frequency, and loop analysis record per flowsheet.
+- the latest dynamics, frequency, and loop analysis record per flowsheet;
 - one versioned plant/controller role specification per flowsheet.
 
 Model edits invalidate the displayed result, while layout-only moves and

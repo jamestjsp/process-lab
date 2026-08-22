@@ -474,7 +474,8 @@ func TestHistoryRestoreRequestReceivesCompleteDocument(t *testing.T) {
 	}
 	path := "/projects" +
 		"/" + strconv.FormatInt(workspace.Project.ID, 10) +
-		"/flows/" + strconv.FormatInt(workspace.Snapshot.Flow.ID, 10)
+		"/flows/" + strconv.FormatInt(workspace.Snapshot.Flow.ID, 10) +
+		"?view=frequency"
 
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	req.Header.Set("HX-Request", "true")
@@ -493,6 +494,9 @@ func TestHistoryRestoreRequestReceivesCompleteDocument(t *testing.T) {
 		if !strings.Contains(body, expected) {
 			t.Errorf("restored document does not contain %q", expected)
 		}
+	}
+	if !strings.Contains(body, `data-workbench-mode="frequency"`) {
+		t.Error("history restore lost the canonical workspace mode")
 	}
 }
 

@@ -108,6 +108,9 @@ type workbenchView struct {
 	Tabs                  []flowTabView
 	Chart                 chartView
 	Analysis              analysisView
+	Mode                  workbenchModeView
+	RecentRuns            []simulationRunView
+	Comparison            simulationComparisonView
 	ControllerCandidate   *controllerCandidateView
 	Error                 string
 	Updated               string
@@ -202,6 +205,7 @@ type paletteItem struct {
 
 type chartView struct {
 	Present    bool
+	Plot       engineeringPlotView
 	Paths      []chartPath
 	YGrid      []chartGrid
 	XGrid      []chartGrid
@@ -229,6 +233,7 @@ type chartPath struct {
 	Key   string
 	D     string
 	Color string
+	Dash  string
 }
 
 type chartGrid struct {
@@ -280,8 +285,48 @@ type analysisPlotView struct {
 	Title   string
 	XLabel  string
 	YLabel  string
+	Plot    engineeringPlotView
 	Paths   []chartPath
 	Markers []analysisMarkerView
+}
+
+type engineeringPlotView struct {
+	ID         string
+	GroupID    string
+	Rect       plotRectView
+	XScale     plotScaleView
+	YScale     plotScaleView
+	XTicks     []plotTickView
+	YTicks     []plotTickView
+	References []plotReferenceView
+}
+
+type plotRectView struct {
+	Left   float64
+	Top    float64
+	Right  float64
+	Bottom float64
+}
+
+type plotScaleView struct {
+	Kind      string
+	DomainMin float64
+	DomainMax float64
+}
+
+type plotTickView struct {
+	Position float64
+	Value    float64
+	Label    string
+}
+
+type plotReferenceView struct {
+	X1    float64
+	Y1    float64
+	X2    float64
+	Y2    float64
+	Label string
+	Kind  string
 }
 
 type analysisMarkerView struct {
@@ -329,6 +374,9 @@ func newWorkbenchView(workspace studio.Workspace, selectedID int64, errorMessage
 			BlockHeight: studio.BlockHeight,
 		},
 	}
+	view.Mode = newWorkbenchModeView(
+		workspace.Project.ID, snapshot.Flow.ID, workbenchModeSimulation, "",
+	)
 	for _, flow := range workspace.Flows {
 		view.Tabs = append(view.Tabs, flowTabView{
 			ID:       flow.ID,
@@ -458,14 +506,35 @@ func dynamicsResultView(record studio.DynamicsAnalysisRecord) analysisResultView
 	)
 	if result.StepExperiment != nil {
 		step := result.StepExperiment
-		view.Plots = append(view.Plots, analysisLinePlot(
-			"Step response", "time (s)", "output",
-			[]analysisSeries{{
+		references := make([]plotReferenceSpec, 0, 3)
+		if step.Metrics.SteadyStateValue != nil {
+			references = append(references, plotReferenceSpec{
+				Axis: plotAxisY, Value: *step.Metrics.SteadyStateValue,
+				Label: "steady state", Kind: "steady-state", IncludeInDomain: true,
+			})
+		}
+		if step.Metrics.RiseTime != nil {
+			references = append(references, plotReferenceSpec{
+				Axis: plotAxisX, Value: *step.Metrics.RiseTime,
+				Label: "rise time", Kind: "rise-time",
+			})
+		}
+		if step.Metrics.SettlingTime != nil {
+			references = append(references, plotReferenceSpec{
+				Axis: plotAxisX, Value: *step.Metrics.SettlingTime,
+				Label: "settling time", Kind: "settling-time",
+			})
+		}
+		view.Plots = append(view.Plots, newAnalysisPlot(engineeringPlotSpec{
+			ID:    "analysis-dynamics-step",
+			Title: "Step response", XLabel: "time (s)", YLabel: "output",
+			Rect: analysisPlotRect(), XScaleKind: plotScaleLinear, YScaleKind: plotScaleLinear,
+			Series: []analysisSeries{{
 				Name: "step", Color: "#e17845",
 				X: step.Times, Y: step.Values,
 			}},
-			nil,
-		))
+			References: references,
+		}))
 		if step.Metrics.RiseTime != nil {
 			view.Metrics = append(view.Metrics, analysisMetricView{
 				Label: "Rise time", Value: formatAnalysisNumber(*step.Metrics.RiseTime) + " s",
@@ -489,9 +558,16 @@ func dynamicsResultView(record studio.DynamicsAnalysisRecord) analysisResultView
 				X: zero.Real, Y: zero.Imag, Label: "○", Kind: "zero",
 			})
 		}
-		view.Plots = append(view.Plots, analysisLinePlot(
-			"Pole-zero map", "real", "imaginary", nil, markers,
-		))
+		view.Plots = append(view.Plots, newAnalysisPlot(engineeringPlotSpec{
+			ID:    "analysis-dynamics-pole-zero",
+			Title: "Pole-zero map", XLabel: "real", YLabel: "imaginary",
+			Rect: analysisPlotRect(), XScaleKind: plotScaleLinear, YScaleKind: plotScaleLinear,
+			Points: markers,
+			References: []plotReferenceSpec{{
+				Axis: plotAxisX, Value: 0, Label: "stability boundary",
+				Kind: "stability-boundary", IncludeInDomain: true,
+			}},
+		}))
 	}
 	for _, issue := range result.Issues {
 		view.Notices = append(view.Notices, issue.Operation+": "+issue.Message)
@@ -540,7 +616,7 @@ func frequencyResultView(record studio.FrequencyAnalysisRecord) analysisResultVi
 				input.BlockID, input.Port, input.Channel,
 			)
 			color := chartColors[index%len(chartColors)]
-			x := transformedFrequencies(result.Grid.Omega)
+			x := result.Grid.Omega
 			magnitudeSeries = append(magnitudeSeries, analysisSeries{
 				Name: name, Key: key, Color: color, X: x,
 				Y: pointerValues(trace.MagnitudeDB),
@@ -551,27 +627,59 @@ func frequencyResultView(record studio.FrequencyAnalysisRecord) analysisResultVi
 			})
 		}
 		view.Plots = append(view.Plots,
-			analysisLinePlot(
-				"Bode magnitude", "log₁₀ ω", "dB", magnitudeSeries, nil,
-			),
-			analysisLinePlot(
-				"Bode phase", "log₁₀ ω", "degrees", phaseSeries, nil,
-			),
+			newAnalysisPlot(engineeringPlotSpec{
+				ID: "analysis-frequency-bode-magnitude", GroupID: "analysis-frequency-bode",
+				Title: "Bode magnitude", XLabel: "ω (rad/s)", YLabel: "dB",
+				Rect: analysisPlotRect(), XScaleKind: plotScaleLog10, YScaleKind: plotScaleLinear,
+				Series: magnitudeSeries,
+				References: []plotReferenceSpec{{
+					Axis: plotAxisY, Value: 0, Label: "0 dB",
+					Kind: "magnitude-zero", IncludeInDomain: true,
+				}},
+			}),
+			newAnalysisPlot(engineeringPlotSpec{
+				ID: "analysis-frequency-bode-phase", GroupID: "analysis-frequency-bode",
+				Title: "Bode phase", XLabel: "ω (rad/s)", YLabel: "degrees",
+				Rect: analysisPlotRect(), XScaleKind: plotScaleLog10, YScaleKind: plotScaleLinear,
+				Series: phaseSeries,
+				References: []plotReferenceSpec{{
+					Axis: plotAxisY, Value: -180, Label: "−180°",
+					Kind: "phase-critical", IncludeInDomain: true,
+				}},
+			}),
 		)
 	}
 	if result.Nyquist != nil {
-		view.Plots = append(view.Plots, complexSamplePlot(
-			"Nyquist", "real", "imaginary",
-			result.Nyquist.Positive, "#2a8f83",
-		))
+		x, y := complexSampleValues(result.Nyquist.Positive)
+		view.Plots = append(view.Plots, newAnalysisPlot(engineeringPlotSpec{
+			ID:    "analysis-frequency-nyquist",
+			Title: "Nyquist", XLabel: "real", YLabel: "imaginary",
+			Rect: analysisPlotRect(), XScaleKind: plotScaleLinear, YScaleKind: plotScaleLinear,
+			Series: []analysisSeries{{
+				Name: "Nyquist", Key: "frequency:nyquist", Color: "#2a8f83", X: x, Y: y,
+			}},
+			Points: []analysisPoint{{X: -1, Y: 0, Label: "×", Kind: "critical"}},
+			References: []plotReferenceSpec{{
+				Axis: plotAxisX, Value: -1, Label: "−1",
+				Kind: "nyquist-critical", IncludeInDomain: true,
+			}},
+		}))
 	}
 	if result.Nichols != nil {
-		view.Plots = append(view.Plots, pointerXYPlot(
-			"Nichols", "phase (deg)", "magnitude (dB)",
-			result.Nichols.PhaseDegrees,
-			result.Nichols.MagnitudeDB,
-			"#c9a13b",
-		))
+		view.Plots = append(view.Plots, newAnalysisPlot(engineeringPlotSpec{
+			ID:    "analysis-frequency-nichols",
+			Title: "Nichols", XLabel: "phase (deg)", YLabel: "magnitude (dB)",
+			Rect: analysisPlotRect(), XScaleKind: plotScaleLinear, YScaleKind: plotScaleLinear,
+			Series: []analysisSeries{{
+				Name: "Nichols", Key: "frequency:nichols", Color: "#c9a13b",
+				X: pointerValues(result.Nichols.PhaseDegrees),
+				Y: pointerValues(result.Nichols.MagnitudeDB),
+			}},
+			References: []plotReferenceSpec{
+				{Axis: plotAxisX, Value: -180, Label: "−180°", Kind: "phase-critical", IncludeInDomain: true},
+				{Axis: plotAxisY, Value: 0, Label: "0 dB", Kind: "magnitude-zero", IncludeInDomain: true},
+			},
+		}))
 	}
 	if result.SingularValues != nil {
 		var series []analysisSeries
@@ -580,13 +688,16 @@ func frequencyResultView(record studio.FrequencyAnalysisRecord) analysisResultVi
 				Name:  fmt.Sprintf("σ%d", index+1),
 				Key:   fmt.Sprintf("frequency:sigma:%d", index+1),
 				Color: chartColors[index%len(chartColors)],
-				X:     transformedFrequencies(result.Grid.Omega),
+				X:     result.Grid.Omega,
 				Y:     pointerValues(values),
 			})
 		}
-		view.Plots = append(view.Plots, analysisLinePlot(
-			"Singular values", "log₁₀ ω", "absolute gain", series, nil,
-		))
+		view.Plots = append(view.Plots, newAnalysisPlot(engineeringPlotSpec{
+			ID:    "analysis-frequency-singular-values",
+			Title: "Singular values", XLabel: "ω (rad/s)", YLabel: "absolute gain",
+			Rect: analysisPlotRect(), XScaleKind: plotScaleLog10, YScaleKind: plotScaleLinear,
+			Series: series,
+		}))
 	}
 	for _, issue := range result.Issues {
 		view.Notices = append(view.Notices, issue.Operation+": "+issue.Message)
@@ -642,13 +753,22 @@ func loopResultView(record studio.LoopAnalysisRecord) analysisResultView {
 				x[sample], y[sample] = value.Real, value.Imag
 			}
 			series = append(series, analysisSeries{
-				Name: fmt.Sprintf("branch %d", index+1), Color: chartColors[index%len(chartColors)],
-				X: x, Y: y,
+				Name:  fmt.Sprintf("branch %d", index+1),
+				Key:   fmt.Sprintf("loop:root-locus:%d", index+1),
+				Color: chartColors[index%len(chartColors)],
+				X:     x, Y: y,
 			})
 		}
-		view.Plots = append(view.Plots, analysisLinePlot(
-			"Root locus", "real", "imaginary", series, nil,
-		))
+		view.Plots = append(view.Plots, newAnalysisPlot(engineeringPlotSpec{
+			ID: "analysis-loop-root-locus", GroupID: "analysis-loop",
+			Title: "Root locus", XLabel: "real", YLabel: "imaginary",
+			Rect: analysisPlotRect(), XScaleKind: plotScaleLinear, YScaleKind: plotScaleLinear,
+			Series: series,
+			References: []plotReferenceSpec{{
+				Axis: plotAxisX, Value: 0, Label: "stability boundary",
+				Kind: "stability-boundary", IncludeInDomain: true,
+			}},
+		}))
 	}
 	for _, applicability := range result.Applicability {
 		if applicability.Status != "available" {
@@ -663,12 +783,20 @@ func loopResultView(record studio.LoopAnalysisRecord) analysisResultView {
 const analysisPlotWidth = 400.0
 const analysisPlotHeight = 140.0
 
+const (
+	plotScaleLinear = "linear"
+	plotScaleLog10  = "log10"
+	plotAxisX       = "x"
+	plotAxisY       = "y"
+)
+
 var chartColors = []string{"#e17845", "#2a8f83", "#c9a13b", "#5277a8"}
 
 type analysisSeries struct {
 	Name  string
 	Key   string
 	Color string
+	Dash  string
 	X     []float64
 	Y     []float64
 }
@@ -680,6 +808,61 @@ type analysisPoint struct {
 	Kind  string
 }
 
+type plotReferenceSpec struct {
+	Axis            string
+	Value           float64
+	Label           string
+	Kind            string
+	IncludeInDomain bool
+}
+
+type engineeringPlotSpec struct {
+	ID         string
+	GroupID    string
+	Title      string
+	XLabel     string
+	YLabel     string
+	Rect       plotRectView
+	XScaleKind string
+	YScaleKind string
+	Series     []analysisSeries
+	Points     []analysisPoint
+	References []plotReferenceSpec
+}
+
+type engineeringPlotResult struct {
+	View    engineeringPlotView
+	Paths   []chartPath
+	Markers []analysisMarkerView
+}
+
+type plotAxis struct {
+	view       plotScaleView
+	pixelStart float64
+	pixelEnd   float64
+	ticks      []plotTickView
+}
+
+type plotRange struct {
+	minimum float64
+	maximum float64
+	present bool
+}
+
+func (bounds *plotRange) add(value float64) {
+	if !finiteViewNumber(value) {
+		return
+	}
+	if !bounds.present {
+		bounds.minimum = value
+		bounds.maximum = value
+		bounds.present = true
+		return
+	}
+	bounds.minimum = math.Min(bounds.minimum, value)
+	bounds.maximum = math.Max(bounds.maximum, value)
+}
+
 func analysisLinePlot(
 	title string,
 	xLabel string,
@@ -687,17 +870,103 @@ func analysisLinePlot(
 	series []analysisSeries,
 	points []analysisPoint,
 ) analysisPlotView {
-	plot := analysisPlotView{Title: title, XLabel: xLabel, YLabel: yLabel}
-	minX, maxX, minY, maxY, ok := analysisBounds(series, points)
-	if !ok {
-		return plot
+	return newAnalysisPlot(engineeringPlotSpec{
+		ID: stablePlotID(title), Title: title, XLabel: xLabel, YLabel: yLabel,
+		Rect:       analysisPlotRect(),
+		XScaleKind: plotScaleLinear,
+		YScaleKind: plotScaleLinear,
+		Series:     series,
+		Points:     points,
+	})
+}
+
+func analysisPlotRect() plotRectView {
+	return plotRectView{Left: 54, Top: 10, Right: analysisPlotWidth - 24, Bottom: analysisPlotHeight - 16}
+}
+
+func newAnalysisPlot(spec engineeringPlotSpec) analysisPlotView {
+	result := buildEngineeringPlot(spec)
+	return analysisPlotView{
+		Title: spec.Title, XLabel: spec.XLabel, YLabel: spec.YLabel,
+		Plot: result.View, Paths: result.Paths, Markers: result.Markers,
 	}
-	for _, values := range series {
+}
+
+func buildEngineeringPlot(spec engineeringPlotSpec) engineeringPlotResult {
+	if spec.Rect == (plotRectView{}) {
+		spec.Rect = analysisPlotRect()
+	}
+	if spec.XScaleKind == "" {
+		spec.XScaleKind = plotScaleLinear
+	}
+	if spec.YScaleKind == "" {
+		spec.YScaleKind = plotScaleLinear
+	}
+	if spec.GroupID == "" {
+		spec.GroupID = spec.ID
+	}
+	result := engineeringPlotResult{View: engineeringPlotView{
+		ID: spec.ID, GroupID: spec.GroupID, Rect: spec.Rect,
+	}}
+
+	var xBounds, yBounds plotRange
+	add := func(x, y float64) {
+		if !validPlotValue(spec.XScaleKind, x) || !validPlotValue(spec.YScaleKind, y) {
+			return
+		}
+		xBounds.add(x)
+		yBounds.add(y)
+	}
+	for _, values := range spec.Series {
+		for index := 0; index < len(values.X) && index < len(values.Y); index++ {
+			add(values.X[index], values.Y[index])
+		}
+	}
+	for _, point := range spec.Points {
+		add(point.X, point.Y)
+	}
+	if !xBounds.present || !yBounds.present {
+		return result
+	}
+	for _, reference := range spec.References {
+		if !reference.IncludeInDomain {
+			continue
+		}
+		switch reference.Axis {
+		case plotAxisX:
+			if validPlotValue(spec.XScaleKind, reference.Value) {
+				xBounds.add(reference.Value)
+			}
+		case plotAxisY:
+			if validPlotValue(spec.YScaleKind, reference.Value) {
+				yBounds.add(reference.Value)
+			}
+		}
+	}
+
+	xAxis, okX := newPlotAxis(
+		spec.XScaleKind, xBounds.minimum, xBounds.maximum,
+		spec.Rect.Left, spec.Rect.Right,
+	)
+	yAxis, okY := newPlotAxis(
+		spec.YScaleKind, yBounds.minimum, yBounds.maximum,
+		spec.Rect.Bottom, spec.Rect.Top,
+	)
+	if !okX || !okY {
+		return result
+	}
+	result.View.XScale = xAxis.view
+	result.View.YScale = yAxis.view
+	result.View.XTicks = xAxis.ticks
+	result.View.YTicks = yAxis.ticks
+
+	for index, values := range spec.Series {
 		var path strings.Builder
 		started := false
-		for i := 0; i < len(values.X) && i < len(values.Y); i++ {
-			x, y := values.X[i], values.Y[i]
-			if !finiteViewNumber(x) || !finiteViewNumber(y) {
+		for sample := 0; sample < len(values.X) && sample < len(values.Y); sample++ {
+			x, xOK := xAxis.position(values.X[sample])
+			y, yOK := yAxis.position(values.Y[sample])
+			if !xOK || !yOK {
 				started = false
 				continue
 			}
@@ -706,102 +975,289 @@ func analysisLinePlot(
 				command = "M"
 				started = true
 			}
-			fmt.Fprintf(&path, "%s %.2f %.2f ", command,
-				scaleAnalysis(x, minX, maxX, 18, analysisPlotWidth-10),
-				scaleAnalysis(y, minY, maxY, analysisPlotHeight-16, 10),
-			)
+			fmt.Fprintf(&path, "%s %.2f %.2f ", command, x, y)
 		}
-		if path.Len() > 0 {
-			plot.Paths = append(plot.Paths, chartPath{
-				Name: values.Name, Key: values.Key,
-				D: strings.TrimSpace(path.String()), Color: values.Color,
-			})
+		if path.Len() == 0 {
+			continue
 		}
-	}
-	for _, point := range points {
-		plot.Markers = append(plot.Markers, analysisMarkerView{
-			X:     scaleAnalysis(point.X, minX, maxX, 18, analysisPlotWidth-10),
-			Y:     scaleAnalysis(point.Y, minY, maxY, analysisPlotHeight-16, 10),
-			Label: point.Label,
-			Kind:  point.Kind,
+		key := values.Key
+		if key == "" {
+			key = fmt.Sprintf("%s:series:%d", spec.ID, index)
+		}
+		result.Paths = append(result.Paths, chartPath{
+			Name: values.Name, Key: key,
+			D: strings.TrimSpace(path.String()), Color: values.Color, Dash: values.Dash,
 		})
 	}
-	return plot
+	for _, point := range spec.Points {
+		x, xOK := xAxis.position(point.X)
+		y, yOK := yAxis.position(point.Y)
+		if !xOK || !yOK {
+			continue
+		}
+		result.Markers = append(result.Markers, analysisMarkerView{
+			X: x, Y: y, Label: point.Label, Kind: point.Kind,
+		})
+	}
+
+	references := append([]plotReferenceSpec(nil), spec.References...)
+	if spec.XScaleKind == plotScaleLinear &&
+		xAxis.contains(0) && !hasPlotReference(references, plotAxisX, 0) {
+		references = append(references, plotReferenceSpec{Axis: plotAxisX, Kind: "x-zero"})
+	}
+	if spec.YScaleKind == plotScaleLinear &&
+		yAxis.contains(0) && !hasPlotReference(references, plotAxisY, 0) {
+		references = append(references, plotReferenceSpec{Axis: plotAxisY, Kind: "y-zero"})
+	}
+	for _, reference := range references {
+		switch reference.Axis {
+		case plotAxisX:
+			position, ok := xAxis.position(reference.Value)
+			if ok {
+				result.View.References = append(result.View.References, plotReferenceView{
+					X1: position, Y1: spec.Rect.Top, X2: position, Y2: spec.Rect.Bottom,
+					Label: reference.Label, Kind: reference.Kind,
+				})
+			}
+		case plotAxisY:
+			position, ok := yAxis.position(reference.Value)
+			if ok {
+				result.View.References = append(result.View.References, plotReferenceView{
+					X1: spec.Rect.Left, Y1: position, X2: spec.Rect.Right, Y2: position,
+					Label: reference.Label, Kind: reference.Kind,
+				})
+			}
+		}
+	}
+	return result
 }
 
-func analysisBounds(
-	series []analysisSeries,
-	points []analysisPoint,
-) (float64, float64, float64, float64, bool) {
-	minX, maxX := math.Inf(1), math.Inf(-1)
-	minY, maxY := math.Inf(1), math.Inf(-1)
-	add := func(x, y float64) {
-		if !finiteViewNumber(x) || !finiteViewNumber(y) {
-			return
+func newPlotAxis(kind string, minimum, maximum, pixelStart, pixelEnd float64) (plotAxis, bool) {
+	if !validPlotValue(kind, minimum) || !validPlotValue(kind, maximum) || minimum > maximum ||
+		!finiteViewNumber(pixelStart) || !finiteViewNumber(pixelEnd) || pixelStart == pixelEnd {
+		return plotAxis{}, false
+	}
+	var domainMin, domainMax float64
+	var values []float64
+	switch kind {
+	case plotScaleLinear:
+		domainMin, domainMax, values = linearPlotTicks(minimum, maximum)
+	case plotScaleLog10:
+		domainMin, domainMax, values = logarithmicPlotTicks(minimum, maximum)
+	default:
+		return plotAxis{}, false
+	}
+	if !validPlotValue(kind, domainMin) || !validPlotValue(kind, domainMax) || domainMin >= domainMax {
+		return plotAxis{}, false
+	}
+	axis := plotAxis{
+		view:       plotScaleView{Kind: kind, DomainMin: domainMin, DomainMax: domainMax},
+		pixelStart: pixelStart, pixelEnd: pixelEnd,
+	}
+	for _, value := range values {
+		position, ok := axis.position(value)
+		if !ok {
+			continue
 		}
-		minX, maxX = math.Min(minX, x), math.Max(maxX, x)
-		minY, maxY = math.Min(minY, y), math.Max(maxY, y)
+		axis.ticks = append(axis.ticks, plotTickView{
+			Position: position, Value: value, Label: formatPlotTick(value),
+		})
 	}
-	for _, values := range series {
-		for i := 0; i < len(values.X) && i < len(values.Y); i++ {
-			add(values.X[i], values.Y[i])
-		}
-	}
-	for _, point := range points {
-		add(point.X, point.Y)
-	}
-	if math.IsInf(minX, 1) {
-		return 0, 0, 0, 0, false
-	}
-	minX, maxX = paddedAnalysisRange(minX, maxX)
-	minY, maxY = paddedAnalysisRange(minY, maxY)
-	return minX, maxX, minY, maxY, true
+	return axis, len(axis.ticks) > 0
 }
 
-func paddedAnalysisRange(minimum, maximum float64) (float64, float64) {
+func linearPlotTicks(minimum, maximum float64) (float64, float64, []float64) {
 	if minimum == maximum {
-		padding := math.Max(math.Abs(minimum)*0.1, 1)
-		return minimum - padding, maximum + padding
+		value := minimum
+		switch {
+		case value == 0:
+			minimum, maximum = -1, 1
+		case value > 0:
+			minimum = value * 0.9
+			maximum = value * 1.1
+			if !finiteViewNumber(maximum) || maximum <= minimum {
+				maximum = value
+			}
+		case value < 0:
+			minimum = value * 1.1
+			maximum = value * 0.9
+			if !finiteViewNumber(minimum) || maximum <= minimum {
+				minimum = value
+			}
+		}
+		if minimum >= maximum {
+			if value > 0 {
+				minimum, maximum = 0, value
+			} else {
+				minimum, maximum = value, 0
+			}
+		}
 	}
-	padding := (maximum - minimum) * 0.05
-	return minimum - padding, maximum + padding
-}
-
-func scaleAnalysis(value, minimum, maximum, low, high float64) float64 {
-	return low + (value-minimum)*(high-low)/(maximum-minimum)
-}
-
-func analysisPointerPlot(
-	title, xLabel, yLabel string,
-	x []float64,
-	y []*float64,
-	logX bool,
-	color string,
-) analysisPlotView {
-	values := pointerValues(y)
-	if logX {
-		x = transformedFrequencies(x)
+	span := maximum - minimum
+	if !finiteViewNumber(span) || span <= 0 {
+		values := []float64{minimum}
+		if minimum < 0 && maximum > 0 {
+			values = append(values, 0)
+		}
+		values = append(values, maximum)
+		return minimum, maximum, values
 	}
-	return analysisLinePlot(title, xLabel, yLabel, []analysisSeries{{
-		Name: title, Color: color, X: x, Y: values,
-	}}, nil)
+	step := nicePlotStep(span / 5)
+	if !finiteViewNumber(step) || step <= 0 {
+		return minimum, maximum, []float64{minimum, maximum}
+	}
+	padding := span * 0.05
+	paddedMin, paddedMax := minimum, maximum
+	if minimum != 0 && finiteViewNumber(minimum-padding) {
+		paddedMin -= padding
+	}
+	if maximum != 0 && finiteViewNumber(maximum+padding) {
+		paddedMax += padding
+	}
+	domainMin := math.Floor(paddedMin/step) * step
+	domainMax := math.Ceil(paddedMax/step) * step
+	if !finiteViewNumber(domainMin) || !finiteViewNumber(domainMax) || domainMin >= domainMax {
+		return minimum, maximum, []float64{minimum, maximum}
+	}
+	count := int(math.Round((domainMax-domainMin)/step)) + 1
+	if count < 2 || count > 100 {
+		return domainMin, domainMax, []float64{domainMin, domainMax}
+	}
+	values := make([]float64, 0, count)
+	for index := 0; index < count; index++ {
+		value := domainMin + float64(index)*step
+		if math.Abs(value) < step*1e-10 {
+			value = 0
+		}
+		values = append(values, value)
+	}
+	return domainMin, domainMax, values
 }
 
-func pointerXYPlot(
-	title, xLabel, yLabel string,
-	x, y []*float64,
-	color string,
-) analysisPlotView {
-	return analysisLinePlot(title, xLabel, yLabel, []analysisSeries{{
-		Name: title, Color: color, X: pointerValues(x), Y: pointerValues(y),
-	}}, nil)
+func nicePlotStep(value float64) float64 {
+	if !finiteViewNumber(value) || value <= 0 {
+		return 0
+	}
+	exponent := math.Floor(math.Log10(value))
+	power := math.Pow(10, exponent)
+	fraction := value / power
+	var nice float64
+	switch {
+	case fraction <= 1:
+		nice = 1
+	case fraction <= 2:
+		nice = 2
+	case fraction <= 5:
+		nice = 5
+	default:
+		nice = 10
+	}
+	return nice * power
 }
 
-func complexSamplePlot(
-	title, xLabel, yLabel string,
-	values []studio.ComplexSample,
-	color string,
-) analysisPlotView {
+func logarithmicPlotTicks(minimum, maximum float64) (float64, float64, []float64) {
+	minimumExponent := int(math.Floor(math.Log10(minimum)))
+	maximumExponent := int(math.Ceil(math.Log10(maximum)))
+	if minimumExponent == maximumExponent {
+		minimumExponent--
+		maximumExponent++
+	}
+	domainMin := math.Pow(10, float64(minimumExponent))
+	domainMax := math.Pow(10, float64(maximumExponent))
+	if !validPlotValue(plotScaleLog10, domainMin) {
+		domainMin = minimum
+	}
+	if !validPlotValue(plotScaleLog10, domainMax) {
+		domainMax = maximum
+	}
+	decades := maximumExponent - minimumExponent
+	stride := max(1, int(math.Ceil(float64(decades)/10)))
+	values := make([]float64, 0, decades/stride+2)
+	for exponent := minimumExponent; exponent <= maximumExponent; exponent += stride {
+		value := math.Pow(10, float64(exponent))
+		if validPlotValue(plotScaleLog10, value) && value >= domainMin && value <= domainMax {
+			values = append(values, value)
+		}
+	}
+	if len(values) == 0 || values[len(values)-1] != domainMax {
+		values = append(values, domainMax)
+	}
+	return domainMin, domainMax, values
+}
+
+func (axis plotAxis) position(value float64) (float64, bool) {
+	if !validPlotValue(axis.view.Kind, value) || !axis.contains(value) {
+		return 0, false
+	}
+	var fraction float64
+	switch axis.view.Kind {
+	case plotScaleLinear:
+		span := axis.view.DomainMax - axis.view.DomainMin
+		if finiteViewNumber(span) {
+			fraction = (value - axis.view.DomainMin) / span
+		} else {
+			scale := math.Max(math.Abs(axis.view.DomainMin), math.Abs(axis.view.DomainMax))
+			fraction = (value/scale - axis.view.DomainMin/scale) /
+				(axis.view.DomainMax/scale - axis.view.DomainMin/scale)
+		}
+	case plotScaleLog10:
+		minimum := math.Log10(axis.view.DomainMin)
+		fraction = (math.Log10(value) - minimum) / (math.Log10(axis.view.DomainMax) - minimum)
+	default:
+		return 0, false
+	}
+	position := axis.pixelStart + fraction*(axis.pixelEnd-axis.pixelStart)
+	return position, finiteViewNumber(position)
+}
+
+func (axis plotAxis) contains(value float64) bool {
+	return value >= axis.view.DomainMin && value <= axis.view.DomainMax
+}
+
+func validPlotValue(kind string, value float64) bool {
+	if !finiteViewNumber(value) {
+		return false
+	}
+	return kind != plotScaleLog10 || value > 0
+}
+
+func hasPlotReference(references []plotReferenceSpec, axis string, value float64) bool {
+	for _, reference := range references {
+		if reference.Axis == axis && reference.Value == value {
+			return true
+		}
+	}
+	return false
+}
+
+func formatPlotTick(value float64) string {
+	if value == 0 {
+		return "0"
+	}
+	return fmt.Sprintf("%.4g", value)
+}
+
+func stablePlotID(title string) string {
+	var id strings.Builder
+	separator := false
+	for _, character := range strings.ToLower(title) {
+		if character >= 'a' && character <= 'z' || character >= '0' && character <= '9' {
+			if separator && id.Len() > 0 {
+				id.WriteByte('-')
+			}
+			id.WriteRune(character)
+			separator = false
+		} else {
+			separator = true
+		}
+	}
+	if id.Len() == 0 {
+		return "plot"
+	}
+	return id.String()
+}
+
+func complexSampleValues(values []studio.ComplexSample) ([]float64, []float64) {
 	x := make([]float64, len(values))
 	y := make([]float64, len(values))
 	for i, value := range values {
@@ -810,9 +1266,7 @@ func complexSamplePlot(
 			x[i], y[i] = *value.Real, *value.Imag
 		}
 	}
-	return analysisLinePlot(title, xLabel, yLabel, []analysisSeries{{
-		Name: title, Color: color, X: x, Y: y,
-	}}, nil)
+	return x, y
 }
 
 func pointerValues(values []*float64) []float64 {
@@ -822,14 +1276,6 @@ func pointerValues(values []*float64) []float64 {
 		if value != nil {
 			result[i] = *value
 		}
-	}
-	return result
-}
-
-func transformedFrequencies(values []float64) []float64 {
-	result := make([]float64, len(values))
-	for i, value := range values {
-		result[i] = math.Log10(value)
 	}
 	return result
 }
@@ -992,55 +1438,37 @@ func newChartView(run *studio.Simulation) chartView {
 		Fidelity:   newFidelityView(run.Fidelity, run.SampleTime),
 	}
 	if len(run.Series) > 0 {
-		minY, maxY := 0.0, 0.0
-		for _, series := range run.Series {
-			for _, value := range series.Values {
-				minY = math.Min(minY, value)
-				maxY = math.Max(maxY, value)
-			}
-		}
-		if maxY-minY < 1e-9 {
-			maxY++
-			minY--
-		}
-		padding := (maxY - minY) * 0.12
-		maxY += padding
-		minY -= padding
-		plotWidth := width - left - right
-		plotHeight := height - top - bottom
-		duration := run.Times[len(run.Times)-1]
+		seriesValues := make([]analysisSeries, 0, len(run.Series))
 		for index, series := range run.Series {
-			var path strings.Builder
-			for sample, value := range series.Values {
-				x := left + (run.Times[sample]/duration)*plotWidth
-				y := top + (maxY-value)/(maxY-minY)*plotHeight
-				if sample == 0 {
-					fmt.Fprintf(&path, "M %.2f %.2f", x, y)
-				} else {
-					fmt.Fprintf(&path, " L %.2f %.2f", x, y)
-				}
-			}
-			view.Paths = append(view.Paths, chartPath{
+			seriesValues = append(seriesValues, analysisSeries{
 				Name: series.Name,
 				Key: fmt.Sprintf(
 					"%d:%d:%d", series.BlockID, series.Port, series.Channel,
 				),
-				D: path.String(), Color: colors[index%len(colors)],
+				X: run.Times, Y: series.Values, Color: colors[index%len(colors)],
 			})
 		}
-		for i := range 5 {
-			fraction := float64(i) / 4
-			value := maxY - fraction*(maxY-minY)
+		plot := buildEngineeringPlot(engineeringPlotSpec{
+			ID: "simulation-trend", GroupID: "simulation",
+			Rect:       plotRectView{Left: left, Top: top, Right: width - right, Bottom: height - bottom},
+			XScaleKind: plotScaleLinear, YScaleKind: plotScaleLinear,
+			Series: seriesValues,
+			References: []plotReferenceSpec{{
+				Axis: plotAxisY, Value: 0, Kind: "y-zero", IncludeInDomain: true,
+			}},
+		})
+		view.Plot = plot.View
+		view.Paths = plot.Paths
+		for _, tick := range plot.View.YTicks {
 			view.YGrid = append(view.YGrid, chartGrid{
-				Position: top + fraction*plotHeight,
-				Label:    fmt.Sprintf("%.2g", value),
+				Position: tick.Position,
+				Label:    tick.Label,
 			})
 		}
-		for i := range 5 {
-			fraction := float64(i) / 4
+		for _, tick := range plot.View.XTicks {
 			view.XGrid = append(view.XGrid, chartGrid{
-				Position: left + fraction*plotWidth,
-				Label:    fmt.Sprintf("%.1f", fraction*duration),
+				Position: tick.Position,
+				Label:    tick.Label,
 			})
 		}
 	}

@@ -1479,6 +1479,70 @@ body.is-resizing-dock .studio-grid {
   font-weight: 620;
 }
 
+.workspace-modes {
+  min-width: 0;
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.workspace-modes a {
+  flex: none;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--ink-inverse-muted);
+  font-size: var(--fs-100);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.workspace-modes a:hover,
+.workspace-modes a:focus-visible,
+.workspace-modes a[aria-current="page"] {
+  border-color: var(--housing-line-strong);
+  color: var(--ink-inverse);
+  background: var(--housing-deep);
+}
+
+.simulation-workspace,
+.comparison-workspace {
+  padding: 10px;
+}
+
+.workspace-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.workspace-section-header h2 {
+  font-size: var(--fs-400);
+}
+
+.simulation-workspace .run-form label,
+.simulation-workspace .run-limits {
+  color: var(--ink-muted);
+}
+
+.simulation-workspace .run-form label > span {
+  border-color: var(--sheet-line);
+  color: var(--ink-muted);
+  background: var(--sheet-card);
+}
+
+.simulation-workspace .run-form input {
+  color: var(--ink);
+}
+
+.simulation-workspace .results-export {
+  border-color: var(--sheet-line);
+  color: var(--probe-deep);
+}
+
 .run-form {
   display: flex;
   align-items: flex-end;
@@ -1654,6 +1718,7 @@ body.is-resizing-dock .studio-grid {
    lets the panel scroll rather than the page when space runs out. */
 .trend-panel {
   min-width: 0;
+  margin: 0;
   overflow-x: auto;
   border: 1px solid var(--sheet-line);
   border-radius: var(--radius);
@@ -2149,7 +2214,7 @@ body.is-resizing-dock .studio-grid {
 
 .analysis-plots {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
   gap: 8px;
   padding: 8px;
 }
@@ -2157,7 +2222,7 @@ body.is-resizing-dock .studio-grid {
 .analysis-plot {
   min-width: 0;
   margin: 0;
-  overflow: hidden;
+  overflow-x: auto;
   border: 1px solid var(--sheet-line-soft);
   border-radius: var(--radius-sm);
   background: #fbfcfc;
@@ -2197,8 +2262,217 @@ body.is-resizing-dock .studio-grid {
 
 .analysis-plot svg {
   width: 100%;
-  min-width: 230px;
+  min-width: 400px;
   display: block;
+}
+
+.analysis-plot:focus-visible,
+.trend-panel:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.chart-tools {
+  display: flex;
+  gap: 3px;
+  padding: 4px 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--sheet-line-soft);
+  scrollbar-width: thin;
+}
+
+.chart-tools button,
+.run-history-actions a {
+  flex: none;
+  min-height: 24px;
+  padding: 2px 7px;
+  border: 1px solid var(--sheet-line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+  background: var(--sheet-card);
+  cursor: pointer;
+  font: 700 9px/1 var(--font-sans);
+  text-decoration: none;
+}
+
+.chart-tools button:hover,
+.chart-tools button:focus-visible,
+.chart-tools button[aria-pressed="true"],
+.run-history-actions a:hover,
+.run-history-actions a:focus-visible,
+.run-history-actions a[aria-current="true"] {
+  border-color: var(--probe);
+  color: var(--probe-deep);
+  background: var(--probe-glow);
+}
+
+.chart-tools button:disabled {
+  cursor: default;
+  opacity: .45;
+}
+
+.chart-readout {
+  min-height: 25px;
+  display: block;
+  padding: 5px 8px;
+  border-top: 1px solid var(--sheet-line-soft);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.chart-reference {
+  stroke: #7a8e88;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-reference-stability-boundary,
+.chart-reference-nyquist-critical,
+.chart-reference-phase-critical,
+.chart-reference-magnitude-zero,
+.chart-reference-y-zero {
+  stroke: #a46047;
+}
+
+.chart-reference-rise-time,
+.chart-reference-settling-time,
+.chart-reference-steady-state {
+  stroke: #5277a8;
+}
+
+.chart-reference-label {
+  fill: #6c4b40;
+  font-family: var(--font-mono);
+  font-size: 8px;
+}
+
+.chart-cursor-line {
+  stroke: #152b27;
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-cursor-point {
+  fill: var(--sheet-card);
+  stroke: #152b27;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.run-history {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--sheet-line);
+  border-radius: var(--radius);
+  background: var(--sheet-card);
+}
+
+.run-history > header,
+.run-history-title,
+.run-history-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.run-history h3 {
+  margin: 0;
+  font-size: var(--fs-300);
+}
+
+.run-history ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-history li {
+  padding: 8px;
+  border: 1px solid var(--sheet-line-soft);
+  border-radius: var(--radius-sm);
+}
+
+.run-history li.is-baseline {
+  border-color: var(--probe);
+  box-shadow: inset 3px 0 var(--probe);
+}
+
+.run-history-title {
+  justify-content: flex-start;
+  font-size: var(--fs-100);
+}
+
+.run-history-title time {
+  margin-left: auto;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+
+.run-history-title span {
+  padding: 1px 4px;
+  border-radius: 999px;
+  color: var(--probe-deep);
+  background: var(--probe-glow);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.run-history-title span.is-stale {
+  color: #744a08;
+  background: #fff0cd;
+}
+
+.run-history dl {
+  display: flex;
+  gap: 12px;
+  margin: 7px 0;
+  font-size: 9px;
+}
+
+.run-history dl div {
+  display: flex;
+  gap: 4px;
+}
+
+.run-history dd {
+  margin: 0;
+  font-family: var(--font-mono);
+}
+
+.run-history-actions {
+  justify-content: flex-start;
+}
+
+.run-history-actions > span {
+  color: var(--ink-muted);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.comparison-warning,
+.comparison-unmatched {
+  margin: 10px 0;
+  padding: 9px 11px;
+  border: 1px solid #d5a13e;
+  border-radius: var(--radius-sm);
+  color: #744a08;
+  background: #fff8e5;
+  font-size: var(--fs-100);
+}
+
+.comparison-unmatched h3 {
+  margin: 0;
+}
+
+.comparison-unmatched ul {
+  margin-bottom: 0;
 }
 
 .analysis-axis {
@@ -3393,6 +3667,14 @@ body.is-resizing-dock .studio-grid {
     min-height: 62px;
   }
 
+  .workspace-section-header {
+    display: grid;
+  }
+
+  .workspace-section-header .run-form {
+    width: 100%;
+  }
+
   .dock-body {
     overflow: visible;
   }
@@ -3469,6 +3751,10 @@ body.is-resizing-dock .studio-grid {
   .results-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .workspace-modes {
+    width: 100%;
   }
 
   .run-form {

@@ -97,7 +97,7 @@ func TestTabStripRendersEverySheetInPositionOrder(t *testing.T) {
 	if len(workspace.Flows) != 4 {
 		t.Fatalf("project holds %d flowsheets, want 4", len(workspace.Flows))
 	}
-	if opened != fmt.Sprintf("/projects/1/flows/%d", workspace.Flows[3].ID) {
+	if opened != fmt.Sprintf("/projects/1/flows/%d?view=simulation", workspace.Flows[3].ID) {
 		t.Fatalf("+ opened %q, want the sheet it created", opened)
 	}
 	if workspace.Flows[3].Name != "Flowsheet 1" {
@@ -123,7 +123,7 @@ func TestTabStripRendersEverySheetInPositionOrder(t *testing.T) {
 		t.Fatalf("run status = %d, body = %s", ran.Code, ran.Body.String())
 	}
 
-	response := request(t, server, http.MethodGet, fmt.Sprintf("/projects/1/flows/%d", column.ID), nil)
+	response := request(t, server, http.MethodGet, fmt.Sprintf("/projects/1/flows/%d?view=simulation", column.ID), nil)
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d", response.Code)
 	}
@@ -162,14 +162,14 @@ func TestTabStripRendersEverySheetInPositionOrder(t *testing.T) {
 		}
 		// The pushed address is the canonical page, never the fragment: a
 		// pushed fragment URL reloads as a bare <main> with no stylesheet.
-		wantPush := fmt.Sprintf("/projects/1/flows/%s", tab.id)
+		wantPush := fmt.Sprintf("/projects/1/flows/%s?view=simulation", tab.id)
 		if tab.pushURL != wantPush {
 			t.Errorf("%q pushes %q, want %q", tab.name, tab.pushURL, wantPush)
 		}
 		if tab.href != wantPush {
 			t.Errorf("%q links to %q, want %q", tab.name, tab.href, wantPush)
 		}
-		wantFragment := fmt.Sprintf("/flows/%s/workbench", tab.id)
+		wantFragment := fmt.Sprintf("/flows/%s/workbench?view=simulation", tab.id)
 		if tab.fragment != wantFragment {
 			t.Errorf("%q fetches %q, want %q", tab.name, tab.fragment, wantFragment)
 		}

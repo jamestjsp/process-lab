@@ -679,10 +679,10 @@ func newControllerCandidateView(
 	view.UndoAvailable = pending.Applied && pending.Undo != nil &&
 		!pending.applying && !pending.undoing
 	view.ApplyPath = fmt.Sprintf(
-		"/flows/%d/controller-candidates/%s/apply", pending.FlowID, pending.ID,
+		"/flows/%d/controller-candidates/%s/apply?view=design", pending.FlowID, pending.ID,
 	)
 	view.UndoPath = fmt.Sprintf(
-		"/flows/%d/controller-candidates/%s/undo", pending.FlowID, pending.ID,
+		"/flows/%d/controller-candidates/%s/undo?view=design", pending.FlowID, pending.ID,
 	)
 	view.RefreshFormID = "pid-controller-design-form"
 	if pending.Kind == "state-space" {
@@ -858,20 +858,21 @@ func appendControllerPlots(
 	if len(currentBode) == 0 || len(candidateBode) == 0 {
 		return
 	}
-	view.Plots = append(view.Plots, analysisLinePlot(
-		"Complementary sensitivity", "log₁₀ ω", "dB",
-		[]analysisSeries{
+	view.Plots = append(view.Plots, newAnalysisPlot(engineeringPlotSpec{
+		ID: "controller-complementary-sensitivity", GroupID: "controller-frequency",
+		Title: "Complementary sensitivity", XLabel: "ω (rad/s)", YLabel: "dB",
+		Rect: analysisPlotRect(), XScaleKind: plotScaleLog10, YScaleKind: plotScaleLinear,
+		Series: []analysisSeries{
 			{
 				Name: "Current", Color: "#5277a8",
-				X: transformedFrequencies(review.Robustness.Grid.Omega),
+				X: review.Robustness.Grid.Omega,
 				Y: pointerValues(currentBode[0].MagnitudeDB),
 			},
 			{
 				Name: "Candidate", Color: "#e17845",
-				X: transformedFrequencies(review.Robustness.Grid.Omega),
+				X: review.Robustness.Grid.Omega,
 				Y: pointerValues(candidateBode[0].MagnitudeDB),
 			},
 		},
-		nil,
-	))
+	}))
 }
