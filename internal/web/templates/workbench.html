@@ -44,9 +44,9 @@
     <line x1="{{$.Plot.Rect.Left}}" x2="{{$.Plot.Rect.Right}}" y1="{{.Position}}" y2="{{.Position}}" class="chart-grid"></line>
     <text x="{{$.Plot.Rect.Left}}" y="{{.Position}}" dx="-4" class="chart-label y-label">{{.Label}}</text>
     {{end}}
-    {{range .Plot.XTicks}}
-    <line x1="{{.Position}}" x2="{{.Position}}" y1="{{$.Plot.Rect.Top}}" y2="{{$.Plot.Rect.Bottom}}" class="chart-grid chart-grid-x"></line>
-    <text x="{{.Position}}" y="{{$.Plot.Rect.Bottom}}" dy="12" class="chart-label x-label">{{.Label}}</text>
+    {{range $tickIndex, $tick := .Plot.XTicks}}
+    <line x1="{{$tick.Position}}" x2="{{$tick.Position}}" y1="{{$.Plot.Rect.Top}}" y2="{{$.Plot.Rect.Bottom}}" class="chart-grid chart-grid-x"></line>
+    <text x="{{$tick.Position}}" y="{{$.Plot.Rect.Bottom}}" dy="12" class="chart-label x-label{{if eq $tickIndex 0}} x-label-first{{end}}">{{$tick.Label}}</text>
     {{end}}
     <g data-chart-characteristic-lines data-chart-characteristic>
       {{range .Plot.References}}

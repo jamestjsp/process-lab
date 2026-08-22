@@ -1820,6 +1820,10 @@ body.is-resizing-dock .studio-grid {
   text-anchor: middle;
 }
 
+.x-label-first {
+  text-anchor: start;
+}
+
 /* The template pins the unit caption at x=760, which collides with the
    final tick label now that chart type sits above the 11px floor. There
    are always exactly five ticks, so nudging it into the gap between the
