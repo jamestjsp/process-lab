@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "ctms-dc-motor",
+  "source": {
+    "title": "DC Motor Speed: System Modeling",
+    "url": "https://ctms.engin.umich.edu/CTMS/?example=MotorSpeed&section=SystemModeling",
+    "section": "Transfer Function",
+    "checkedAt": "2026-08-22"
+  },
+  "simulation": {"duration": 3, "sampleTime": 0.01, "expectedDriver": "batch-lsim"},
+  "expectedSeries": "Motor speed",
+  "expectedAnalysisOutputs": ["DC motor · output 1 · value"],
+  "oracle": "analytic-two-pole-step",
+  "tolerance": 1e-10,
+  "document": {
+    "version": 1,
+    "blocks": [
+      {"kind":"source","name":"Armature voltage","position":{"x":0,"y":80},"parameters":{"amplitude":"1","initial_value":"0","step_time":"0"}},
+      {"kind":"transfer","name":"DC motor","position":{"x":320,"y":80},"parameters":{"numerator":"0.01","denominator":"0.005, 0.06, 0.1001"}},
+      {"kind":"scope","name":"Motor speed","position":{"x":650,"y":80},"parameters":{}}
+    ],
+    "wires": [
+      {"source":"Armature voltage","sourcePort":0,"target":"DC motor","targetPort":0},
+      {"source":"DC motor","sourcePort":0,"target":"Motor speed","targetPort":0}
+    ]
+  }
+}

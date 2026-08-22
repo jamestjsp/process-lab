@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "mathworks-fopdt",
+  "source": {
+    "title": "Time Delays in Linear Systems",
+    "url": "https://www.mathworks.com/help/control/ug/time-delays-in-linear-systems.html",
+    "section": "First Order Plus Dead Time Model",
+    "checkedAt": "2026-08-22"
+  },
+  "simulation": {"duration": 4, "sampleTime": 0.01, "expectedDriver": "delay-aware-simulate"},
+  "expectedSeries": "Delayed response",
+  "expectedAnalysisOutputs": ["First order plant · output 1 · value"],
+  "oracle": "mathworks-formula-analytic",
+  "tolerance": 1e-10,
+  "document": {
+    "version": 1,
+    "blocks": [
+      {"kind":"source","name":"Unit step","position":{"x":0,"y":80},"parameters":{"amplitude":"1","initial_value":"0","step_time":"0"}},
+      {"kind":"delay","name":"Input delay","position":{"x":240,"y":80},"parameters":{"delay":"2.1","initial_output":"0","delay_mode":"exact","approximation":"3","sample_time_mode":"explicit","sample_time":"0.1"}},
+      {"kind":"transfer","name":"First order plant","position":{"x":500,"y":80},"parameters":{"numerator":"1","denominator":"1, 10"}},
+      {"kind":"scope","name":"Delayed response","position":{"x":780,"y":80},"parameters":{}}
+    ],
+    "wires": [
+      {"source":"Unit step","sourcePort":0,"target":"Input delay","targetPort":0},
+      {"source":"Input delay","sourcePort":0,"target":"First order plant","targetPort":0},
+      {"source":"First order plant","sourcePort":0,"target":"Delayed response","targetPort":0}
+    ]
+  }
+}
