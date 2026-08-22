@@ -207,6 +207,7 @@ type chartView struct {
 	Present    bool
 	Plot       engineeringPlotView
 	Paths      []chartPath
+	SplitPlots []trendPlotView
 	YGrid      []chartGrid
 	XGrid      []chartGrid
 	Duration   string
@@ -215,6 +216,15 @@ type chartView struct {
 	Metrics    []studio.Metric
 	Spectra    []spectrumView
 	Fidelity   fidelityView
+}
+
+type trendPlotView struct {
+	Title     string
+	SeriesKey string
+	Plot      engineeringPlotView
+	Paths     []chartPath
+	YGrid     []chartGrid
+	XGrid     []chartGrid
 }
 
 type fidelityView struct {
@@ -1470,6 +1480,39 @@ func newChartView(run *studio.Simulation) chartView {
 				Position: tick.Position,
 				Label:    tick.Label,
 			})
+		}
+		for index, series := range seriesValues {
+			const splitHeight = 180.0
+			split := buildEngineeringPlot(engineeringPlotSpec{
+				ID: fmt.Sprintf(
+					"simulation-trend-%d-%d-%d",
+					run.Series[index].BlockID, run.Series[index].Port, run.Series[index].Channel,
+				),
+				GroupID: "simulation",
+				Rect: plotRectView{
+					Left: left, Top: top, Right: width - right, Bottom: splitHeight - bottom,
+				},
+				XScaleKind: plotScaleLinear, YScaleKind: plotScaleLinear,
+				Series: []analysisSeries{series},
+				References: []plotReferenceSpec{{
+					Axis: plotAxisY, Value: 0, Kind: "y-zero", IncludeInDomain: true,
+				}},
+			})
+			panel := trendPlotView{
+				Title: series.Name, SeriesKey: series.Key,
+				Plot: split.View, Paths: split.Paths,
+			}
+			for _, tick := range split.View.YTicks {
+				panel.YGrid = append(panel.YGrid, chartGrid{
+					Position: tick.Position, Label: tick.Label,
+				})
+			}
+			for _, tick := range split.View.XTicks {
+				panel.XGrid = append(panel.XGrid, chartGrid{
+					Position: tick.Position, Label: tick.Label,
+				})
+			}
+			view.SplitPlots = append(view.SplitPlots, panel)
 		}
 	}
 	for _, spectrum := range run.Spectra {
