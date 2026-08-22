@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "ctms-cruise-pi",
+  "source": {
+    "title": "Cruise Control: Simulink Controller Design",
+    "url": "https://ctms.engin.umich.edu/CTMS/index.php?example=CruiseControl&section=SimulinkControl",
+    "section": "Implementing PI control and Closed-loop response",
+    "checkedAt": "2026-08-22"
+  },
+  "simulation": {"duration": 10, "sampleTime": 0.01, "expectedDriver": "batch-lsim"},
+  "expectedSeries": "Vehicle speed",
+  "expectedAnalysisOutputs": ["Vehicle · output 1 · value"],
+  "oracle": "analytic-closed-loop-step",
+  "tolerance": 1e-9,
+  "document": {
+    "version": 1,
+    "blocks": [
+      {"kind":"source","name":"Speed command","position":{"x":0,"y":80},"parameters":{"amplitude":"10","initial_value":"0","step_time":"0"}},
+      {"kind":"sum","name":"Speed error","position":{"x":220,"y":80},"parameters":{"signs":"+-","signal_width":"1"}},
+      {"kind":"pid","name":"PI controller","position":{"x":400,"y":80},"parameters":{"proportional":"800","integral":"40","derivative":"0","filter_coefficient":"100","time_domain":"continuous","sample_time":"0.1"}},
+      {"kind":"transfer","name":"Vehicle","position":{"x":600,"y":80},"parameters":{"numerator":"1","denominator":"1000, 50"}},
+      {"kind":"scope","name":"Vehicle speed","position":{"x":820,"y":80},"parameters":{}}
+    ],
+    "wires": [
+      {"source":"Speed command","sourcePort":0,"target":"Speed error","targetPort":0},
+      {"source":"Vehicle","sourcePort":0,"target":"Speed error","targetPort":1},
+      {"source":"Speed error","sourcePort":0,"target":"PI controller","targetPort":0},
+      {"source":"PI controller","sourcePort":0,"target":"Vehicle","targetPort":0},
+      {"source":"Vehicle","sourcePort":0,"target":"Vehicle speed","targetPort":0}
+    ]
+  }
+}

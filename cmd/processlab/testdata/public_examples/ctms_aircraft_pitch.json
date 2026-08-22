@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "ctms-aircraft-pitch",
+  "source": {
+    "title": "Aircraft Pitch: Simulink Modeling",
+    "url": "https://ctms.engin.umich.edu/CTMS/?example=AircraftPitch&section=SimulinkModeling",
+    "section": "Generating the open-loop and closed-loop response",
+    "checkedAt": "2026-08-22"
+  },
+  "simulation": {"duration": 10, "sampleTime": 0.01, "expectedDriver": "batch-lsim"},
+  "expectedSeries": "Pitch angle",
+  "expectedAnalysisOutputs": [
+    "Aircraft dynamics · output 1 · alpha",
+    "Aircraft dynamics · output 1 · q",
+    "Aircraft dynamics · output 1 · theta"
+  ],
+  "oracle": "independent-rk4-published-state-equations",
+  "tolerance": 1e-7,
+  "document": {
+    "version": 1,
+    "blocks": [
+      {"kind":"source","name":"Pitch command","position":{"x":0,"y":80},"parameters":{"amplitude":"0.2","initial_value":"0","step_time":"0"}},
+      {"kind":"gain","name":"Precompensator","position":{"x":180,"y":80},"parameters":{"gain":"7.0711"}},
+      {"kind":"sum","name":"Elevator command","position":{"x":360,"y":80},"parameters":{"signs":"+-","signal_width":"1"}},
+      {"kind":"state_space","name":"Aircraft dynamics","position":{"x":560,"y":80},"parameters":{"a":"-0.313, 56.7, 0; -0.0139, -0.426, 0; 0, 56.7, 0","b":"0.232; 0.0203; 0","c":"1, 0, 0; 0, 1, 0; 0, 0, 1","d":"0; 0; 0","initial_state":"0, 0, 0","input_names":"delta","output_names":"alpha, q, theta","state_names":"alpha, q, theta","time_domain":"continuous","sample_time":"0.1"}},
+      {"kind":"matrix_gain","name":"State feedback","position":{"x":560,"y":320},"parameters":{"d":"-0.6435, 169.695, 7.0711","input_names":"alpha, q, theta","output_names":"feedback"}},
+      {"kind":"demux","name":"States","position":{"x":800,"y":80},"parameters":{"input_names":"alpha, q, theta"}},
+      {"kind":"scope","name":"Pitch angle","position":{"x":1020,"y":160},"parameters":{}}
+    ],
+    "wires": [
+      {"source":"Pitch command","sourcePort":0,"target":"Precompensator","targetPort":0},
+      {"source":"Precompensator","sourcePort":0,"target":"Elevator command","targetPort":0},
+      {"source":"State feedback","sourcePort":0,"target":"Elevator command","targetPort":1},
+      {"source":"Elevator command","sourcePort":0,"target":"Aircraft dynamics","targetPort":0},
+      {"source":"Aircraft dynamics","sourcePort":0,"target":"State feedback","targetPort":0},
+      {"source":"Aircraft dynamics","sourcePort":0,"target":"States","targetPort":0},
+      {"source":"States","sourcePort":2,"target":"Pitch angle","targetPort":0}
+    ]
+  }
+}
