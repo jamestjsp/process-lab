@@ -138,19 +138,55 @@ func (s *Server) simulationCSV(w http.ResponseWriter, r *http.Request) {
 }
 
 func simulationCSVData(run studio.Simulation) ([]byte, error) {
+	columns, err := simulationCSVColumns(run)
+	if err != nil {
+		return nil, err
+	}
+
+	var output bytes.Buffer
+	writer := csv.NewWriter(&output)
+	writer.UseCRLF = true
+	header := make([]string, len(columns))
+	rowCount := 0
+	for index, column := range columns {
+		header[index] = column.Header
+		rowCount = max(rowCount, len(column.Values))
+	}
+	if err := writer.Write(header); err != nil {
+		return nil, fmt.Errorf("write simulation CSV header: %w", err)
+	}
+	row := make([]string, len(columns))
+	for sample := range rowCount {
+		for index, column := range columns {
+			row[index] = ""
+			if sample < len(column.Values) {
+				row[index] = strconv.FormatFloat(column.Values[sample], 'g', -1, 64)
+			}
+		}
+		if err := writer.Write(row); err != nil {
+			return nil, fmt.Errorf("write simulation CSV row: %w", err)
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, fmt.Errorf("write simulation CSV: %w", err)
+	}
+	return output.Bytes(), nil
+}
+
+type simulationCSVColumn struct {
+	Header string
+	Values []float64
+}
+
+func simulationCSVColumns(run studio.Simulation) ([]simulationCSVColumn, error) {
 	series := append([]studio.Series(nil), run.Series...)
 	sort.SliceStable(series, func(i, j int) bool {
-		left, right := series[i].ResultChannel, series[j].ResultChannel
-		if left.BlockID != right.BlockID {
-			return left.BlockID < right.BlockID
-		}
-		if left.Port != right.Port {
-			return left.Port < right.Port
-		}
-		if left.Channel != right.Channel {
-			return left.Channel < right.Channel
-		}
-		return left.Name < right.Name
+		return simulationResultChannelLess(series[i].ResultChannel, series[j].ResultChannel)
+	})
+	spectra := append([]studio.Spectrum(nil), run.Spectra...)
+	sort.SliceStable(spectra, func(i, j int) bool {
+		return simulationResultChannelLess(spectra[i].ResultChannel, spectra[j].ResultChannel)
 	})
 	for index, value := range run.Times {
 		if !finite(value) {
@@ -168,40 +204,87 @@ func simulationCSVData(run studio.Simulation) ([]byte, error) {
 			}
 		}
 	}
+	for _, spectrum := range spectra {
+		if len(spectrum.Frequencies) != len(spectrum.Magnitudes) {
+			return nil, fmt.Errorf(
+				"simulation spectrum %q has %d frequencies for %d magnitudes",
+				spectrum.Name, len(spectrum.Frequencies), len(spectrum.Magnitudes),
+			)
+		}
+		for index, value := range spectrum.Frequencies {
+			if !finite(value) {
+				return nil, fmt.Errorf("simulation spectrum %q frequency %d is not finite", spectrum.Name, index)
+			}
+		}
+		for index, value := range spectrum.Magnitudes {
+			if !finite(value) {
+				return nil, fmt.Errorf("simulation spectrum %q magnitude %d is not finite", spectrum.Name, index)
+			}
+		}
+	}
 
-	var output bytes.Buffer
-	writer := csv.NewWriter(&output)
-	writer.UseCRLF = true
-	header := make([]string, 1, len(series)+1)
-	header[0] = "time [unit=s]"
+	columns := make([]simulationCSVColumn, 0, 1+len(series)+2*len(spectra))
+	if len(series) > 0 || len(spectra) == 0 {
+		columns = append(columns, simulationCSVColumn{Header: "time [unit=s]", Values: run.Times})
+	}
 	for _, signal := range series {
 		name := signal.Name
 		if name == "" {
 			name = "signal"
 		}
-		header = append(header, fmt.Sprintf(
-			"%s [unit=unspecified;blockId=%d;port=%d;channel=%d]",
-			name, signal.BlockID, signal.Port, signal.Channel,
-		))
+		columns = append(columns, simulationCSVColumn{
+			Header: simulationCSVChannelHeader(name, "unspecified", signal.ResultChannel),
+			Values: signal.Values,
+		})
 	}
-	if err := writer.Write(header); err != nil {
-		return nil, fmt.Errorf("write simulation CSV header: %w", err)
-	}
-	row := make([]string, len(series)+1)
-	for sample, timestamp := range run.Times {
-		row[0] = strconv.FormatFloat(timestamp, 'g', -1, 64)
-		for column, signal := range series {
-			row[column+1] = strconv.FormatFloat(signal.Values[sample], 'g', -1, 64)
+	for _, spectrum := range spectra {
+		name := spectrum.Name
+		if name == "" {
+			name = "spectrum"
 		}
-		if err := writer.Write(row); err != nil {
-			return nil, fmt.Errorf("write simulation CSV row: %w", err)
-		}
+		columns = append(columns,
+			simulationCSVColumn{
+				Header: simulationCSVChannelHeader("frequency", "Hz", spectrum.ResultChannel),
+				Values: spectrum.Frequencies,
+			},
+			simulationCSVColumn{
+				Header: simulationCSVChannelHeader(name, "magnitude", spectrum.ResultChannel),
+				Values: spectrum.Magnitudes,
+			},
+		)
 	}
-	writer.Flush()
-	if err := writer.Error(); err != nil {
-		return nil, fmt.Errorf("write simulation CSV: %w", err)
+	return columns, nil
+}
+
+func simulationResultChannelLess(left, right studio.ResultChannel) bool {
+	if left.BlockID != right.BlockID {
+		return left.BlockID < right.BlockID
 	}
-	return output.Bytes(), nil
+	if left.Port != right.Port {
+		return left.Port < right.Port
+	}
+	if left.Channel != right.Channel {
+		return left.Channel < right.Channel
+	}
+	return left.Name < right.Name
+}
+
+func simulationCSVChannelHeader(name, unit string, channel studio.ResultChannel) string {
+	return spreadsheetSafeCSVCell(fmt.Sprintf(
+		"%s [unit=%s;blockId=%d;port=%d;channel=%d]",
+		name, unit, channel.BlockID, channel.Port, channel.Channel,
+	))
+}
+
+func spreadsheetSafeCSVCell(value string) string {
+	if value == "" {
+		return value
+	}
+	switch value[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + value
+	}
+	return value
 }
 
 func finite(value float64) bool {

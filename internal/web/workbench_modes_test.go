@@ -157,3 +157,34 @@ func TestEngineeringPlotMarkupExposesAccessibleControls(t *testing.T) {
 		}
 	}
 }
+
+func TestSimulationDifferencePreservesDiscreteBaselineHolds(t *testing.T) {
+	currentTimes := []float64{0.5, 1.5}
+	currentValues := []float64{0, 1}
+	baselineTimes := []float64{0, 1, 2}
+	baselineValues := []float64{0, 1, 0}
+
+	discrete := simulationDifference(
+		currentTimes, currentValues, baselineTimes, baselineValues,
+		studio.Fidelity{ModelDomain: "discrete"},
+	)
+	if discrete[0] != 0 || discrete[1] != 0 {
+		t.Fatalf("discrete difference = %v, want held baseline values", discrete)
+	}
+
+	delayAware := simulationDifference(
+		currentTimes, currentValues, baselineTimes, baselineValues,
+		studio.Fidelity{SourceHold: "sampled-zero-order-hold"},
+	)
+	if delayAware[0] != 0 || delayAware[1] != 0 {
+		t.Fatalf("sampled-hold difference = %v, want held baseline values", delayAware)
+	}
+
+	continuous := simulationDifference(
+		currentTimes, currentValues, baselineTimes, baselineValues,
+		studio.Fidelity{ModelDomain: "continuous", SourceHold: "piecewise-constant"},
+	)
+	if continuous[0] != -0.5 || continuous[1] != 0.5 {
+		t.Fatalf("continuous difference = %v, want linear interpolation", continuous)
+	}
+}

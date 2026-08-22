@@ -373,6 +373,7 @@ func compareSimulationRuns(
 			Color: chartColors[index%len(chartColors)], X: current.Times,
 			Y: simulationDifference(
 				current.Times, series.Values, baseline.Times, baselineSeries.Values,
+				baseline.Fidelity,
 			),
 		})
 	}
@@ -422,12 +423,13 @@ func simulationDifference(
 	currentValues []float64,
 	baselineTimes []float64,
 	baselineValues []float64,
+	baselineFidelity studio.Fidelity,
 ) []float64 {
 	count := min(len(currentTimes), len(currentValues))
 	difference := make([]float64, count)
 	for index := range count {
-		baseline, ok := interpolatedSimulationValue(
-			baselineTimes, baselineValues, currentTimes[index],
+		baseline, ok := simulationComparisonValue(
+			baselineTimes, baselineValues, currentTimes[index], baselineFidelity,
 		)
 		if !ok || !finiteViewNumber(currentValues[index]) {
 			difference[index] = math.NaN()
@@ -436,6 +438,32 @@ func simulationDifference(
 		difference[index] = currentValues[index] - baseline
 	}
 	return difference
+}
+
+func simulationComparisonValue(
+	times []float64,
+	values []float64,
+	target float64,
+	fidelity studio.Fidelity,
+) (float64, bool) {
+	if fidelity.ModelDomain == "discrete" || fidelity.SourceHold == "sampled-zero-order-hold" {
+		return heldSimulationValue(times, values, target)
+	}
+	return interpolatedSimulationValue(times, values, target)
+}
+
+func heldSimulationValue(times, values []float64, target float64) (float64, bool) {
+	count := min(len(times), len(values))
+	if count == 0 || !finiteViewNumber(target) || !finiteViewNumber(times[0]) ||
+		!finiteViewNumber(times[count-1]) || target < times[0] || target > times[count-1] {
+		return 0, false
+	}
+	right := sort.Search(count, func(index int) bool { return times[index] > target })
+	index := right - 1
+	if index < 0 || !finiteViewNumber(times[index]) || !finiteViewNumber(values[index]) {
+		return 0, false
+	}
+	return values[index], true
 }
 
 func interpolatedSimulationValue(times, values []float64, target float64) (float64, bool) {

@@ -235,3 +235,109 @@ func TestSimulationCSVQuotesMultichannelIdentityAndRejectsNonFiniteValues(t *tes
 		}
 	}
 }
+
+func TestSimulationCSVIncludesSpectrumFrequencyDomains(t *testing.T) {
+	run := studio.Simulation{
+		Times: []float64{0, 0.5},
+		Series: []studio.Series{{
+			ResultChannel: studio.ResultChannel{
+				BlockID: 9, Port: 0, Channel: 0, Name: "temperature",
+			},
+			Values: []float64{1, 2},
+		}},
+		Spectra: []studio.Spectrum{
+			{
+				ResultChannel: studio.ResultChannel{
+					BlockID: 7, Port: 0, Channel: 1, Name: "secondary spectrum",
+				},
+				Frequencies: []float64{0, 1}, Magnitudes: []float64{3, 4},
+			},
+			{
+				ResultChannel: studio.ResultChannel{
+					BlockID: 3, Port: 0, Channel: 0, Name: "primary spectrum",
+				},
+				Frequencies: []float64{0, 1, 2}, Magnitudes: []float64{5, 6, 7},
+			},
+		},
+	}
+
+	encoded, err := simulationCSVData(run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := csv.NewReader(strings.NewReader(string(encoded))).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 4 || len(records[0]) != 6 {
+		t.Fatalf("mixed CSV shape = %#v", records)
+	}
+	for index, expected := range []string{
+		"time [unit=s]",
+		"temperature [unit=unspecified;blockId=9;port=0;channel=0]",
+		"frequency [unit=Hz;blockId=3;port=0;channel=0]",
+		"primary spectrum [unit=magnitude;blockId=3;port=0;channel=0]",
+		"frequency [unit=Hz;blockId=7;port=0;channel=1]",
+		"secondary spectrum [unit=magnitude;blockId=7;port=0;channel=1]",
+	} {
+		if records[0][index] != expected {
+			t.Fatalf("mixed CSV header %d = %q, want %q", index, records[0][index], expected)
+		}
+	}
+	if got := records[3]; got[0] != "" || got[1] != "" || got[2] != "2" || got[3] != "7" || got[4] != "" || got[5] != "" {
+		t.Fatalf("mixed CSV final row = %#v", got)
+	}
+
+	spectrumOnly := run
+	spectrumOnly.Series = nil
+	encoded, err = simulationCSVData(spectrumOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err = csv.NewReader(strings.NewReader(string(encoded))).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records[0]) != 4 || strings.HasPrefix(records[0][0], "time ") ||
+		!strings.HasPrefix(records[0][0], "frequency ") {
+		t.Fatalf("spectrum-only CSV = %#v", records)
+	}
+}
+
+func TestSimulationCSVNeutralizesFormulaLeadingNames(t *testing.T) {
+	for index, name := range []string{"=formula", "+formula", "-formula", "@formula"} {
+		run := studio.Simulation{
+			Times: []float64{0},
+			Series: []studio.Series{{
+				ResultChannel: studio.ResultChannel{
+					BlockID: int64(index + 1), Name: name,
+				},
+				Values: []float64{1},
+			}},
+		}
+		encoded, err := simulationCSVData(run)
+		if err != nil {
+			t.Fatal(err)
+		}
+		records, err := csv.NewReader(strings.NewReader(string(encoded))).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := records[0][1]; !strings.HasPrefix(got, "'"+name) {
+			t.Fatalf("header for %q = %q, want spreadsheet-safe prefix", name, got)
+		}
+	}
+}
+
+func TestSimulationCSVRejectsMalformedSpectrumData(t *testing.T) {
+	for _, spectrum := range []studio.Spectrum{
+		{Frequencies: []float64{0, 1}, Magnitudes: []float64{1}},
+		{Frequencies: []float64{math.NaN()}, Magnitudes: []float64{1}},
+		{Frequencies: []float64{0}, Magnitudes: []float64{math.Inf(1)}},
+	} {
+		run := studio.Simulation{Spectra: []studio.Spectrum{spectrum}}
+		if encoded, err := simulationCSVData(run); err == nil || len(encoded) != 0 {
+			t.Fatalf("malformed spectrum produced %q with error %v", encoded, err)
+		}
+	}
+}
