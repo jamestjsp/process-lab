@@ -30,10 +30,10 @@ let boundedBlockUpdate = ''
 // destroy, so it is dropped before the markup goes rather than after.
 onBeforeSwap((event) => {
   boundedBlockUpdate =
-    event?.detail?.xhr?.getResponseHeader('X-Process-Lab-Block-Update') || ''
+    event?.detail?.ctx?.response?.headers?.get('X-Process-Lab-Block-Update') || ''
   if (hasConnectionSource()) cancelConnection('Workbench updated')
 })
-document.addEventListener('htmx:historyRestore', () => {
+document.addEventListener('htmx:before:history:restore', () => {
   if (hasConnectionSource()) cancelConnection('Workbench restored')
 })
 

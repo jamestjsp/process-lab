@@ -68,9 +68,9 @@ function focusInspectorName(node) {
       field.focus()
       field.select()
     }
-    document.removeEventListener('htmx:afterSettle', focusWhenReady)
+    document.removeEventListener('htmx:after:swap', focusWhenReady)
   }
-  document.addEventListener('htmx:afterSettle', focusWhenReady)
+  document.addEventListener('htmx:after:swap', focusWhenReady)
 }
 
 function disconnectBlock(node) {

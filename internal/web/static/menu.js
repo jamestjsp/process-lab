@@ -144,7 +144,7 @@
   document.addEventListener('pointerdown', (event) => {
     if (contextMenu && !event.target.closest('[data-context-menu]')) closeContextMenu()
   }, true)
-  document.addEventListener('htmx:beforeSwap', closeContextMenu)
+  document.addEventListener('htmx:before:swap', closeContextMenu)
   document.addEventListener('wheel', closeContextMenu, { passive: true })
   // An open menu owns the keyboard, the same way a focused text field
   // does: while one is up, a global shortcut elsewhere must not also act on

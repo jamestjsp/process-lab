@@ -579,11 +579,12 @@ func (s *Server) renderControllerCandidateFailure(
 	if candidate == nil {
 		candidate = &pendingControllerCandidate{FlowID: flowID}
 	}
-	s.renderControllerCandidate(
+	s.renderControllerCandidateResponse(
 		w,
 		r,
 		candidate,
 		message,
+		http.StatusBadRequest,
 	)
 }
 
@@ -592,6 +593,16 @@ func (s *Server) renderControllerCandidate(
 	r *http.Request,
 	candidate *pendingControllerCandidate,
 	message string,
+) {
+	s.renderControllerCandidateResponse(w, r, candidate, message, http.StatusOK)
+}
+
+func (s *Server) renderControllerCandidateResponse(
+	w http.ResponseWriter,
+	r *http.Request,
+	candidate *pendingControllerCandidate,
+	message string,
+	status int,
 ) {
 	if r.Header.Get("HX-Request") != "true" {
 		snapshot, err := s.studio.Snapshot(r.Context(), candidate.FlowID)
@@ -605,6 +616,7 @@ func (s *Server) renderControllerCandidate(
 	w.Header().Set("HX-Retarget", "#controller-candidate")
 	w.Header().Set("HX-Reswap", "innerHTML")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
 	view := newControllerCandidateView(candidate, message)
 	if err := s.templates.ExecuteTemplate(w, "controller-candidate", view); err != nil {
 		http.Error(

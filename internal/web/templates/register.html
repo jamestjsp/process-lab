@@ -10,13 +10,16 @@
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/tokens.css">
   <link rel="stylesheet" href="/assets/register.css">
-  <script src="/assets/htmx-2.0.10.min.js"></script>
+  <script src="/assets/htmx-4.0.0.min.js"></script>
   <!-- The register loads neither the canvas modules nor menu.js: it is a
        different shell from the workbench, sharing only tokens.css's palette
        with it. -->
   <script src="/assets/register.js" defer></script>
 </head>
-<body class="register-page">
+<body
+  class="register-page"
+  hx-status:4xx:inherited="swap:none"
+  hx-status:5xx:inherited="swap:none">
   <header class="register-bar">
     <a class="brand" href="/" aria-label="Process Lab home">
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>

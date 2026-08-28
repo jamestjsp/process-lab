@@ -26,28 +26,19 @@ client holds must be re-applied afterwards**, or it silently disappears on
 the next edit. This is the recurring failure mode in this file; three
 separate defects during implementation traced back to it.
 
-Re-application happens in one place, on **both** `htmx:afterSwap` and
-`htmx:afterSettle`, and again on `htmx:historyRestore`:
+Re-application happens once, on HTMX 4's `htmx:after:swap`:
 
 ```js
-const restoreViewport = (settled) => {
-  syncViewportToFlow(settled); applyViewport(); applySelection(); redrawEdges()
+const restoreViewport = () => {
+  syncViewportToFlow(); applyViewport(); applySelection(); redrawEdges()
 }
-document.addEventListener('htmx:afterSwap', () => restoreViewport(false))
-document.addEventListener('htmx:afterSettle', () => restoreViewport(true))
-document.addEventListener('htmx:historyRestore', () => restoreViewport(true))
+document.addEventListener('htmx:after:swap', restoreViewport)
 ```
 
-Both swap events are required. At `afterSwap`,
-`document.querySelector('#flow-canvas')` still returns the node htmx is about
-to discard, so styling it there writes to a doomed element and the view snaps
-back to the origin. `afterSettle` is what actually sticks. The pair is kept
-because `afterSwap` restores sooner and avoids a visible flash.
-
-`historyRestore` is the third case and is easy to miss: Back and Forward
-rebuild the page from htmx's history cache and fire **neither** swap event, so
-without it the canvas keeps the transform of the sheet you came from and the
-signal wires are never drawn. Tab switching made that reachable in one click.
+HTMX 4 completes the main swap, every out-of-band task, and their settle work
+before firing `after:swap` once. Back and Forward no longer restore an HTMX
+DOM snapshot: they re-fetch the document and follow the same swap lifecycle,
+so the same listener rebuilds the final live DOM without a history-only path.
 
 ## Sheet geometry
 
@@ -341,7 +332,7 @@ can replace the strip mid-gesture.
   about ten milliseconds after the field is created and Blink blurs the field
   on the way out while it is still connected. Treating that as "the user left
   the field" ends the rename the gesture has only just asked for. A `swapping`
-  flag set on `htmx:beforeSwap` is what distinguishes them, and the pending
+  flag set on `htmx:before:swap` is what distinguishes them, and the pending
   rename is re-attached by flowsheet id on the other side.
 - **Creating a sheet is a redirect, so "open it in rename" has to survive a
   navigation.** `POST /projects/{id}/flows` answers with a redirect onto the

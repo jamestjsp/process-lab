@@ -141,6 +141,33 @@ describe("engineering workspace", () => {
     }
   });
 
+  test("controller validation swaps a semantic 400 into its result region", async () => {
+    const {page, problems} = await openWorkbench();
+    try {
+      await chooseMode(page, "design");
+      const form = page.locator("#state-controller-design-form");
+      await form.locator('textarea[name="q"]').fill("not a matrix");
+      const responsePromise = page.waitForResponse((response) =>
+        response.url().includes("/controller-candidates/state-space"));
+      await form.locator("button[type=submit]").click();
+      const response = await responsePromise;
+
+      assert.equal(response.status(), 400);
+      assert.equal(response.request().headers()["hx-request-type"], "partial");
+      await page.locator("#controller-candidate .controller-candidate-error").waitFor();
+      assert.match(
+        await page.locator("#controller-candidate").textContent(),
+        /Q:|matrix/i,
+      );
+      assert.equal(await page.locator("#workbench").count(), 1);
+      assert.equal(await page.locator("#state-controller-design-form").count(), 1);
+      assert.equal(problems.length, 1);
+      assert.match(problems[0], /console: .*status of 400 \(Bad Request\)$/);
+    } finally {
+      await page.close();
+    }
+  });
+
   test("dynamics and frequency modes render inspectable engineering axes", async () => {
     const {page, problems} = await openWorkbench();
     try {

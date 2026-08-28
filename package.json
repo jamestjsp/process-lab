@@ -2,9 +2,11 @@
   "name": "process-lab-browser-tests",
   "private": true,
   "scripts": {
+    "check:htmx": "node scripts/check-htmx-upgrade.mjs",
     "test:browser": "node --test browser/*.test.mjs"
   },
   "devDependencies": {
+    "htmx.org": "4.0.0",
     "playwright-core": "1.62.1"
   }
 }

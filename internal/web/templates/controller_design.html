@@ -17,7 +17,8 @@
       hx-post="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/pid?view=design"
       hx-target="#controller-candidate"
       hx-swap="innerHTML"
-      hx-disabled-elt="button">
+      hx-disable="button"
+      hx-status:400="swap:innerHTML target:#controller-candidate">
       <strong>PID / PID2</strong>
       <label>
         <span>Type</span>
@@ -49,7 +50,8 @@
       hx-post="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/state-space?view=design"
       hx-target="#controller-candidate"
       hx-swap="innerHTML"
-      hx-disabled-elt="button">
+      hx-disable="button"
+      hx-status:400="swap:innerHTML target:#controller-candidate">
       <strong>LQG state-space</strong>
       <label><span>State cost Q</span><textarea name="q" rows="2">1 0
 0 1</textarea></label>
@@ -71,7 +73,8 @@
       hx-post="/flows/{{.Snapshot.Flow.ID}}/controller-candidates/robust?view=design"
       hx-target="#controller-candidate"
       hx-swap="innerHTML"
-      hx-disabled-elt="button">
+      hx-disable="button"
+      hx-status:400="swap:innerHTML target:#controller-candidate">
       <strong>H2 / H∞ synthesis</strong>
       <label>
         <span>Method</span>
@@ -89,7 +92,10 @@
     </form>
   </div>
 
-  <div id="controller-candidate" aria-live="polite">
+  <div
+    id="controller-candidate"
+    aria-live="polite"
+    hx-status:400:inherited="swap:innerHTML target:#controller-candidate">
     {{if .ControllerCandidate}}
       {{template "controller-candidate" .ControllerCandidate}}
     {{else}}

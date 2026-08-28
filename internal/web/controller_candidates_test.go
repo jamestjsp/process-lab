@@ -482,7 +482,7 @@ func TestRobustSynthesisIsAvailableThroughTheControllerWorkspace(t *testing.T) {
 		"/flows/1/controller-candidates/robust",
 		url.Values{"method": {"unknown"}, "review_horizon": {"10"}},
 	)
-	if invalid.Code != http.StatusOK {
+	if invalid.Code != http.StatusBadRequest {
 		t.Fatalf(
 			"invalid robust request status = %d: %s",
 			invalid.Code,

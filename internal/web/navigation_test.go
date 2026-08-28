@@ -490,7 +490,7 @@ func TestHistoryRestoreRequestReceivesCompleteDocument(t *testing.T) {
 	if !strings.Contains(body, "<!doctype html>") {
 		t.Fatal("history restore did not receive a complete document")
 	}
-	for _, expected := range []string{`id="workbench"`, "<title>", `src="/assets/htmx-2.0.10.min.js"`} {
+	for _, expected := range []string{`id="workbench"`, "<title>", `src="/assets/htmx-4.0.0.min.js"`} {
 		if !strings.Contains(body, expected) {
 			t.Errorf("restored document does not contain %q", expected)
 		}
