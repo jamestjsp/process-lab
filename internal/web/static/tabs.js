@@ -543,8 +543,9 @@
   // for it and the swap does the reverting. It is here because the route
   // is free to answer 4xx — the other two do — and a name left showing on
   // a tab the server never accepted is the worst outcome on this strip.
-  document.addEventListener('htmx:responseError', (event) => {
-    const path = (event.detail.pathInfo && event.detail.pathInfo.requestPath) || ''
+  document.addEventListener('htmx:response:error', (event) => {
+    const ctx = event.detail && event.detail.ctx
+    const path = (ctx && ctx.request && ctx.request.action) || ''
     const rename = /^\/flows\/(\d+)\/name$/.exec(path)
     if (!rename && !/^\/flows\/\d+(\/duplicate)?$/.test(path)) return
     if (rename && lastRename && lastRename.id === rename[1]) {
@@ -552,7 +553,7 @@
       if (tab) tab.querySelector('.flow-tab-name').textContent = lastRename.original
     }
     lastRename = null
-    raiseBanner(event.detail.xhr && event.detail.xhr.responseText)
+    raiseBanner(ctx && ctx.text)
   })
 
   // The address bar after a duplicate or a delete. Both answer with the
@@ -576,26 +577,24 @@
   // A field open when a swap begins is about to be discarded along with
   // the strip it sits in, so what was typed into it is kept here for
   // settle() to put back.
-  document.addEventListener('htmx:beforeSwap', () => {
+  document.addEventListener('htmx:before:swap', () => {
     swapping = true
     carried = editor && editor.input.isConnected
       ? { id: editor.id, value: editor.input.value }
       : null
   })
 
-  const settle = (settled) => {
+  const settle = () => {
     swapping = false
     revealActiveTab()
     syncTabStrip()
-    // At afterSwap the incoming markup is not yet what querySelector
-    // returns, so the address is read from the settled DOM only.
-    if (settled) syncAddress()
+    syncAddress()
     // A swap that lands mid-rename discards the field; the request for it
     // is by flowsheet id, so it is re-opened on the tab that replaced it.
     if (!renamingID || (editor && editor.input.isConnected)) return
     const tab = tabFor(renamingID)
     if (tab) beginRename(tab, carried && carried.id === renamingID ? carried.value : undefined)
-    else if (settled) renamingID = ''
+    else renamingID = ''
   }
 
   // scroll does not bubble, and the track is replaced on every swap, so the
@@ -603,9 +602,7 @@
   document.addEventListener('scroll', (event) => {
     if (event.target === tabTrack()) syncTabStrip()
   }, true)
-  document.addEventListener('htmx:afterSwap', () => settle(false))
-  document.addEventListener('htmx:afterSettle', () => settle(true))
-  document.addEventListener('htmx:historyRestore', () => settle(true))
+  document.addEventListener('htmx:after:swap', settle)
   window.addEventListener('resize', syncTabStrip)
 
   revealActiveTab()

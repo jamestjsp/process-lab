@@ -94,7 +94,7 @@
 {{template "workbench" .}}{{end}}
 
 {{define "workbench"}}
-<main id="workbench" class="workbench" data-flow-id="{{.Snapshot.Flow.ID}}" data-workbench-mode="{{.Mode.Name}}" data-canonical-path="{{.Mode.CanonicalPath}}" data-selected-id="{{if .Selected}}{{.Selected.ID}}{{end}}" data-rail-left="expanded" data-rail-right="expanded" data-dock="expanded">
+<main id="workbench" class="workbench" data-flow-id="{{.Snapshot.Flow.ID}}" data-workbench-mode="{{.Mode.Name}}" data-canonical-path="{{.Mode.CanonicalPath}}" data-selected-id="{{if .Selected}}{{.Selected.ID}}{{end}}" data-rail-left="expanded" data-rail-right="expanded" data-dock="expanded" hx-status:4xx:inherited="swap:none" hx-status:5xx:inherited="swap:none">
   <header class="topbar">
     <a class="brand" href="/" aria-label="Process Lab home">
       <span class="brand-mark"><i></i><i></i><i></i></span>
@@ -310,7 +310,7 @@
         <section class="simulation-workspace" aria-labelledby="simulation-heading">
           <header class="workspace-section-header">
             <div><span class="eyebrow">Numerical experiment</span><h2 id="simulation-heading">Simulation output</h2></div>
-            <form class="run-form" id="run-form" method="post" action="/flows/{{.Snapshot.Flow.ID}}/simulations?view=simulation" hx-post="/flows/{{.Snapshot.Flow.ID}}/simulations?view=simulation" hx-target="#workbench" hx-swap="outerHTML" hx-disabled-elt="button">
+            <form class="run-form" id="run-form" method="post" action="/flows/{{.Snapshot.Flow.ID}}/simulations?view=simulation" hx-post="/flows/{{.Snapshot.Flow.ID}}/simulations?view=simulation" hx-target="#workbench" hx-swap="outerHTML" hx-disable="button">
               {{if .Selected}}<input type="hidden" name="selected_id" value="{{.Selected.ID}}">{{end}}
               <label>Duration <span><input name="duration" type="number" min="{{.SimulationMinDuration}}" step="1" value="{{if .Chart.Present}}{{.Chart.Duration}}{{else}}20{{end}}"> s</span></label>
               <label>Sample <span><input name="sample_time" type="number" min="{{.SimulationMinSample}}" step="{{.SimulationMinSample}}" value="{{if .Chart.Present}}{{.Chart.SampleTime}}{{else}}0.10{{end}}"> s</span></label>
@@ -409,7 +409,7 @@
             hx-post="/flows/{{.Snapshot.Flow.ID}}/analyses?view={{.Mode.Name}}"
             hx-target="#workbench"
             hx-swap="outerHTML"
-            hx-disabled-elt="button">
+            hx-disable="button">
             {{if .Selected}}<input type="hidden" name="selected_id" value="{{.Selected.ID}}">{{end}}
             <input type="hidden" name="analysis_intent" value="{{.Mode.Name}}">
             <label class="analysis-channel-field">

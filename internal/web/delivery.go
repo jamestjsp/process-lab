@@ -98,7 +98,7 @@ func compressResponses(next http.Handler) http.Handler {
 func deliveryHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/assets/") {
-			if r.URL.Path == "/assets/htmx-2.0.10.min.js" {
+			if r.URL.Path == "/assets/htmx-4.0.0.min.js" {
 				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 			} else {
 				w.Header().Set("Cache-Control", "no-cache")

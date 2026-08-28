@@ -470,8 +470,9 @@ async function benchBrowser(session, fixture, zoom) {
 }
 
 // benchRedundancy is retained as the command-line name for the route-authority
-// gate. It proves that server paths are empty afterSwap, the single client
-// pass fills them afterSettle, and a geometry change invalidates the cache.
+// gate. It proves that server paths are empty at after:swap capture, the
+// single client pass fills them before the event finishes bubbling, and a
+// geometry change invalidates the cache.
 //
 // It mutates the fixture — it adds, wires, unwires and deletes — so it
 // runs after every timing measurement is complete.
@@ -712,24 +713,21 @@ async function installProbe(session) {
         document.addEventListener(type, fn, capture)
         bind.push([type, fn, capture])
       }
-      add('htmx:beforeSwap', true, 'beforeSwap')
-      add('htmx:afterSwap', true, 'swapStart')
-      add('htmx:afterSwap', false, 'swapEnd')
-      add('htmx:afterSettle', true, 'settleStart')
+      add('htmx:before:swap', true, 'beforeSwap')
+      add('htmx:after:swap', true, 'swapStart')
+      add('htmx:after:swap', false, 'swapEnd')
       const done = () => {
-        t.settleEnd = performance.now()
+        t.end = performance.now()
         requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
           t.frame = performance.now()
           bind.forEach(([type, fn, capture]) => document.removeEventListener(type, fn, capture))
-          document.removeEventListener('htmx:afterSettle', done, false)
+          document.removeEventListener('htmx:after:swap', done, false)
           clearTimeout(guard)
           resolve({
             request: t.beforeSwap - t.t0,
             swap: t.swapStart - t.beforeSwap,
-            afterSwapReapply: t.swapEnd - t.swapStart,
-            settleWait: t.settleStart - t.swapEnd,
-            settleReapply: t.settleEnd - t.settleStart,
-            total: t.settleEnd - t.t0,
+            reapply: t.end - t.swapStart,
+            total: t.end - t.t0,
             toFrame: t.frame - t.t0,
             replaced: {
               workbench: before.workbench !== document.querySelector('#workbench'),
@@ -743,8 +741,8 @@ async function installProbe(session) {
           })
         }, 0)))
       }
-      document.addEventListener('htmx:afterSettle', done, false)
-      bind.push(['htmx:afterSettle', done, false])
+      document.addEventListener('htmx:after:swap', done, false)
+      bind.push(['htmx:after:swap', done, false])
       const guard = setTimeout(() => {
         bind.forEach(([type, fn, capture]) => document.removeEventListener(type, fn, capture))
         reject(new Error('swap did not settle within 30s'))
@@ -769,7 +767,7 @@ async function installProbe(session) {
     }
 
     // The block move. It answers 204 and swaps nothing, so there is no
-    // settle to wait for: htmx:afterRequest is the end of the interaction.
+    // swap to wait for: htmx:after:request is the end of the interaction.
     //
     // The card is moved first and the request then sends where it landed,
     // which is the order savePositions() uses after a drag. Sending a
@@ -783,15 +781,15 @@ async function installProbe(session) {
       card.style.left = (card.offsetLeft + dx) + 'px'
       const t0 = performance.now()
       const done = () => {
-        document.removeEventListener('htmx:afterRequest', done)
+        document.removeEventListener('htmx:after:request', done)
         clearTimeout(guard)
         resolve({ total: performance.now() - t0 })
       }
       const guard = setTimeout(() => {
-        document.removeEventListener('htmx:afterRequest', done)
+        document.removeEventListener('htmx:after:request', done)
         reject(new Error('move did not answer within 30s'))
       }, 30000)
-      document.addEventListener('htmx:afterRequest', done)
+      document.addEventListener('htmx:after:request', done)
       htmx.ajax('PATCH', '/blocks/' + id + '/position', {
         swap: 'none', values: { x: card.offsetLeft, y: card.offsetTop }
       })
@@ -816,7 +814,7 @@ async function installProbe(session) {
       return { ms: performance.now() - t0, paths }
     }
 
-    // Does the one afterSettle routing pass populate every server-empty path?
+    // Does the one after:swap routing pass populate every server-empty path?
     //
     // The server now emits empty d attributes and the browser router is the
     // route authority. Every application listener was registered before this
@@ -828,27 +826,27 @@ async function installProbe(session) {
       const readPaths = () => Array.from(document.querySelectorAll('[data-edge-source]'))
           .map((path) => path.getAttribute('d') || '')
       const captureFirstPass = (event) => {
-        if (event.detail?.xhr?.getResponseHeader('HX-Reswap') === 'none') {
+        if (event.detail?.ctx?.response?.headers?.get('HX-Reswap') === 'none') {
           responseMode = 'bounded'
         }
         if (firstPass === null) firstPass = readPaths()
       }
-      document.addEventListener('htmx:afterSwap', captureFirstPass, false)
+      document.addEventListener('htmx:after:swap', captureFirstPass, true)
 
       const finish = () => {
-        document.removeEventListener('htmx:afterSwap', captureFirstPass, false)
-        document.removeEventListener('htmx:afterSettle', onSettle, false)
+        document.removeEventListener('htmx:after:swap', captureFirstPass, true)
+        document.removeEventListener('htmx:after:swap', onSettle, false)
         clearTimeout(guard)
         const numbers = (value) => (value.match(/-?\\d+(?:\\.\\d+)?/g) || []).map(Number)
         const settled = readPaths()
         if (firstPass === null) {
-          resolve({ kick: kickName, error: 'no afterSwap paths seen; the interaction did not swap' })
+          resolve({ kick: kickName, error: 'no after:swap paths seen; the interaction did not swap' })
           return
         }
         if (firstPass.length !== settled.length) {
           resolve({
             kick: kickName, firstPassPaths: firstPass.length, settledPaths: settled.length,
-            error: 'path count differs between afterSwap and afterSettle'
+            error: 'path count differs before and after application re-apply'
           })
           return
         }
@@ -888,38 +886,38 @@ async function installProbe(session) {
           paths: firstPass.length,
           changed,
           maxDelta,
-          afterSwapFilled: firstPass.filter(Boolean).length,
-          afterSettleFilled: settled.filter(Boolean).length,
-          sample: firstPass.length ? { afterSwap: firstPass[0], afterSettle: settled[0] } : null
+          beforeReapplyFilled: firstPass.filter(Boolean).length,
+          afterReapplyFilled: settled.filter(Boolean).length,
+          sample: firstPass.length ? { beforeReapply: firstPass[0], afterReapply: settled[0] } : null
         }
         const fullSwapFailed = mode === 'swap' &&
-          (result.afterSwapFilled !== 0 ||
-            result.afterSettleFilled !== result.paths ||
+          (result.beforeReapplyFilled !== 0 ||
+            result.afterReapplyFilled !== result.paths ||
             result.changed !== result.paths)
         const boundedSwapFailed = mode === 'bounded' &&
-          (result.afterSwapFilled !== result.paths ||
-            result.afterSettleFilled !== result.paths ||
+          (result.beforeReapplyFilled !== result.paths ||
+            result.afterReapplyFilled !== result.paths ||
             result.changed !== 0)
         const invalidationFailed = mode === 'invalidation' &&
-          (result.afterSettleFilled !== result.paths || result.changed === 0)
+          (result.afterReapplyFilled !== result.paths || result.changed === 0)
         if (fullSwapFailed || boundedSwapFailed || invalidationFailed) {
           result.error = mode + ' route-authority contract failed'
         }
         resolve(result)
       }
       const onSettle = () => requestAnimationFrame(finish)
-      document.addEventListener('htmx:afterSettle', onSettle, false)
+      document.addEventListener('htmx:after:swap', onSettle, false)
       const guard = setTimeout(() => {
-        document.removeEventListener('htmx:afterSwap', captureFirstPass, false)
-        document.removeEventListener('htmx:afterSettle', onSettle, false)
+        document.removeEventListener('htmx:after:swap', captureFirstPass, true)
+        document.removeEventListener('htmx:after:swap', onSettle, false)
         reject(new Error(kickName + ' did not settle within 30s'))
       }, 30000)
 
       try {
         bench.kicks[kickName]()
       } catch (error) {
-        document.removeEventListener('htmx:afterSwap', captureFirstPass, false)
-        document.removeEventListener('htmx:afterSettle', onSettle, false)
+        document.removeEventListener('htmx:after:swap', captureFirstPass, true)
+        document.removeEventListener('htmx:after:swap', onSettle, false)
         clearTimeout(guard)
         reject(error)
       }
@@ -1172,8 +1170,8 @@ function report(results) {
   }
 
   out.push('', `### Browser — parameter edit (PUT /blocks/{id}, ${options.expectedEditSwap} swap)`, '')
-  out.push('| blocks | zoom | request | swap | afterSwap re-apply | htmx settle wait | settle re-apply | total | to first frame | longest task |')
-  out.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
+  out.push('| blocks | zoom | request | swap | application re-apply | total | to first frame | longest task |')
+  out.push('| --- | --- | --- | --- | --- | --- | --- | --- |')
   for (const size of results.sizes) {
     for (const zoom of [1, 0.25]) {
       const edits = size.browser[zoom].edits
@@ -1182,7 +1180,7 @@ function report(results) {
         return Math.max(0, ...(edit.longTasks ?? []).map((entry) => entry.duration))
       }))
       out.push(`| ${size.blocks} | ${Math.round(zoom * 100)}% | ${band(pick('request'))} | ${band(pick('swap'))} | ` +
-        `${band(pick('afterSwapReapply'))} | ${band(pick('settleWait'))} | ${band(pick('settleReapply'))} | ` +
+        `${band(pick('reapply'))} | ` +
         `${band(pick('total'))} | ${band(pick('toFrame'))} | ${band(longest)} |`)
     }
   }
@@ -1213,10 +1211,10 @@ function report(results) {
   }
 
   out.push('', '### Route-authority and cache-invalidation gate', '')
-  out.push('Full swaps must leave every path empty afterSwap and fill them in the single client pass.')
+  out.push('Full swaps must leave every path empty before the application listener and fill them in its single client pass.')
   out.push('A bounded stable-schema edit must preserve every populated path unchanged; `negativeControl` moves')
   out.push('a connected block after settle and must change at least one cached path. Any violation fails the row.', '')
-  out.push('| blocks | interaction | mode | paths | filled afterSwap | filled afterSettle | changed | max delta |')
+  out.push('| blocks | interaction | mode | paths | filled before re-apply | filled after re-apply | changed | max delta |')
   out.push('| --- | --- | --- | --- | --- | --- | --- | --- |')
   for (const size of results.sizes) {
     for (const check of size.redundancy ?? []) {
@@ -1227,14 +1225,14 @@ function report(results) {
       const changed = check.paths ? `${check.changed}/${check.paths}` : '0/0'
       const delta = Number.isFinite(check.maxDelta) ? check.maxDelta.toExponential(1) : '∞'
       out.push(`| ${size.blocks} | ${check.kick} | ${check.mode} | ${check.paths} | ` +
-        `${check.afterSwapFilled} | ${check.afterSettleFilled} | **${changed}** | ` +
+        `${check.beforeReapplyFilled} | ${check.afterReapplyFilled} | **${changed}** | ` +
         `${delta} |`)
     }
   }
   const sample = results.sizes.flatMap((s) => s.redundancy ?? []).find((c) => c.sample && c.paths)
   if (sample) {
     out.push('', 'One path after each client routing pass:', '', '```',
-      `afterSwap: ${sample.sample.afterSwap}`, `afterSettle: ${sample.sample.afterSettle}`, '```')
+      `before re-apply: ${sample.sample.beforeReapply}`, `after re-apply: ${sample.sample.afterReapply}`, '```')
   }
 
   if (results.browserSmoke) {

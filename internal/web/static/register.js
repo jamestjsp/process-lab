@@ -10,7 +10,8 @@
         and leaves.
      2. Keeping the row from toggling underneath a control the
         pointer actually landed on.
-     3. Reporting a refusal, since htmx does not swap a 4xx.
+     3. Reporting a refusal while the inherited status policy keeps a
+        plain-text 4xx from replacing the register.
 
    It is a separate file because the Content-Security-Policy sets
    `script-src 'self'` with no 'unsafe-inline': an inline <script>
@@ -197,8 +198,8 @@
   }
 
   /* --------------------------------------------------------------
-     Refusals. htmx does not swap a 4xx, so without this a rejected
-     name would look like nothing happened at all.
+     Refusals. The page keeps plain-text 4xx responses out of the swap
+     target, so this makes a rejected change visible and recoverable.
      -------------------------------------------------------------- */
 
   const alertBox = () => document.getElementById('register-alert')
@@ -215,18 +216,18 @@
     if (box) box.hidden = true
   }
 
-  document.addEventListener('htmx:beforeRequest', () => {
+  document.addEventListener('htmx:before:request', () => {
     clearAlert()
     rememberOpenRows()
   })
 
-  document.addEventListener('htmx:afterSwap', restoreOpenRows)
+  document.addEventListener('htmx:after:swap', restoreOpenRows)
 
-  document.addEventListener('htmx:responseError', (event) => {
-    const xhr = event.detail && event.detail.xhr
-    const message = xhr && xhr.responseText ? xhr.responseText.trim() : ''
+  document.addEventListener('htmx:response:error', (event) => {
+    const ctx = event.detail && event.detail.ctx
+    const message = ctx && ctx.text ? ctx.text.trim() : ''
     showAlert(message || 'The register could not complete that change.')
-    const row = rowOf(event.detail && event.detail.elt)
+    const row = rowOf(ctx && ctx.sourceElement)
     if (row) cancelRename(row, true)
   })
 

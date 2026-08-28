@@ -7,16 +7,13 @@
 // the only way it survives an edit is to be put back afterwards.
 //
 // One entry point, one ordered list of steps. Modules register what they
-// need to rebuild instead of each adding its own htmx:afterSettle
+// need to rebuild instead of each adding its own htmx:after:swap
 // listener, so the order the state is rebuilt in is written down in one
 // place (main.js) rather than emerging from script order.
 //
-// afterSwap still exposes the outgoing node to querySelector, so rebuilding
-// there writes client state to markup htmx is about to discard. afterSettle
-// is the first event where every step can measure and update the live node.
-//
-// Back and Forward restore the page from htmx's history cache, which
-// fires neither swap event, so historyRestore runs the settled pass too.
+// htmx 4 completes every main and out-of-band task before after:swap, so this
+// is the first single event where every step can measure the final live DOM.
+// History restoration re-fetches the page and follows the same swap path.
 // =====================================================================
 
 const steps = []
@@ -34,6 +31,5 @@ function reapply(event) {
   steps.forEach((step) => step(event))
 }
 
-document.addEventListener('htmx:beforeSwap', (event) => beforeSwapSteps.forEach((step) => step(event)))
-document.addEventListener('htmx:afterSettle', reapply)
-document.addEventListener('htmx:historyRestore', reapply)
+document.addEventListener('htmx:before:swap', (event) => beforeSwapSteps.forEach((step) => step(event)))
+document.addEventListener('htmx:after:swap', reapply)

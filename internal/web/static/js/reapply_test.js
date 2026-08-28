@@ -10,19 +10,18 @@ globalThis.document = {
 
 const { onBeforeSwap, onReapply } = await import('./reapply.js')
 
-test('rebuilds client state only after settle and on history restore', () => {
+test('rebuilds client state once after the complete htmx 4 swap', () => {
   const calls = []
   onBeforeSwap((event) => calls.push(`before:${event.type}`))
   onReapply((event) => calls.push(`reapply:${event.type}`))
 
-  assert.equal(listeners.has('htmx:afterSwap'), false)
-  listeners.get('htmx:beforeSwap')({ type: 'htmx:beforeSwap' })
-  listeners.get('htmx:afterSettle')({ type: 'htmx:afterSettle' })
-  listeners.get('htmx:historyRestore')({ type: 'htmx:historyRestore' })
+  assert.equal(listeners.has('htmx:after:settle'), false)
+  assert.equal(listeners.has('htmx:before:history:restore'), false)
+  listeners.get('htmx:before:swap')({ type: 'htmx:before:swap' })
+  listeners.get('htmx:after:swap')({ type: 'htmx:after:swap' })
 
   assert.deepEqual(calls, [
-    'before:htmx:beforeSwap',
-    'reapply:htmx:afterSettle',
-    'reapply:htmx:historyRestore'
+    'before:htmx:before:swap',
+    'reapply:htmx:after:swap'
   ])
 })

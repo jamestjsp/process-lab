@@ -60,12 +60,19 @@ describe("tab navigation", () => {
   test("back after a swap restores a working page", async () => {
     const {page, problems} = await openWorkbenchWithTwoSheets();
     try {
+      assert.equal(await page.evaluate(() => htmx.version), "4.0.0");
       const firstURL = page.url();
       const firstTitle = await page.title();
 
       const otherTab = page.locator(".flow-tab:not([aria-current])").first();
       const otherFlowID = await otherTab.getAttribute("data-flow-tab");
+      const partialRequest = page.waitForRequest((request) =>
+        request.headers()["hx-request-type"] === "partial");
       await otherTab.click();
+      const partialHeaders = (await partialRequest).headers();
+      assert.equal(partialHeaders["hx-request"], "true");
+      assert.equal(partialHeaders["hx-request-type"], "partial");
+      assert.equal(partialHeaders.accept, "text/html");
       await page.waitForFunction(
         (id) => document.querySelector("#workbench")?.dataset.flowId === id,
         otherFlowID,
@@ -122,11 +129,11 @@ describe("tab navigation", () => {
         otherFlowID,
       );
 
-      // Drop htmx's snapshot cache so going back has to ask the server. This
-      // is the path a new tab, a cleared session, or an evicted entry takes,
-      // and it is the one that returns a fragment if the route ever starts
-      // branching on HX-Request alone.
-      await page.evaluate(() => sessionStorage.removeItem("htmx-history-cache"));
+      assert.equal(
+        await page.evaluate(() => sessionStorage.getItem("htmx-history-cache")),
+        null,
+        "htmx 4 unexpectedly wrote a history snapshot cache",
+      );
 
       // Assert the contract, not just the visible result. Here the workbench
       // fragment happens to be the whole body — the topbar lives inside
@@ -140,7 +147,11 @@ describe("tab navigation", () => {
       page.on("response", (response) => {
         if (response.request().headers()["hx-history-restore-request"]) {
           restores.push(
-            response.text().then((body) => ({url: response.url(), body})),
+            response.text().then((body) => ({
+              url: response.url(),
+              body,
+              headers: response.request().headers(),
+            })),
           );
         }
       });
@@ -153,6 +164,11 @@ describe("tab navigation", () => {
 
       const restoredResponses = await Promise.all(restores);
       assert.equal(restoredResponses.length, 1, "the server restore path was not used");
+      assert.equal(
+        restoredResponses[0].headers["hx-history-restore-request"],
+        "true",
+      );
+      assert.equal(restoredResponses[0].headers["hx-request-type"], "full");
       assert.match(
         restoredResponses[0].body.trimStart().slice(0, 40).toLowerCase(),
         /^<!doctype html>/,

@@ -5,6 +5,11 @@ rather than guessed. This began as the decision document that set the
 block-count budget; it now records the baseline, each benchmark-driven
 milestone, and the final release evidence.
 
+The measurements below predate the HTMX 4 migration, so their camelCase event
+names describe the HTMX 2 lifecycle used for those samples. The runnable
+benchmark now uses HTMX 4's colon-separated events and its single completed
+`htmx:after:swap` application pass.
+
 ## 2026-08-02 performance-refactor baseline
 
 The orthogonal-routing work changed the architecture after the original study:

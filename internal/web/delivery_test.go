@@ -153,7 +153,7 @@ func TestApplicationDeliveryHeadersAndRepresentations(t *testing.T) {
 		t.Fatalf("dynamic Cache-Control = %q", cache)
 	}
 
-	htmx := request(t, server, http.MethodGet, "/assets/htmx-2.0.10.min.js", nil)
+	htmx := request(t, server, http.MethodGet, "/assets/htmx-4.0.0.min.js", nil)
 	if cache := htmx.Header().Get("Cache-Control"); cache != "public, max-age=31536000, immutable" {
 		t.Fatalf("HTMX Cache-Control = %q", cache)
 	}

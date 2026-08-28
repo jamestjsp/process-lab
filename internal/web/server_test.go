@@ -46,7 +46,7 @@ func TestPageRendersTheRegister(t *testing.T) {
 		`href="/assets/tokens.css"`,
 		`href="/assets/register.css"`,
 		`src="/assets/register.js"`,
-		`src="/assets/htmx-2.0.10.min.js"`,
+		`src="/assets/htmx-4.0.0.min.js"`,
 	} {
 		if !strings.Contains(body, expected) {
 			t.Errorf("register does not contain %q", expected)
@@ -328,7 +328,7 @@ func TestWorkbenchPageRendersTheShell(t *testing.T) {
 		`href="/assets/tokens.css"`,
 		`id="workbench"`,
 		`hx-post="/flows/1/blocks?view=simulation"`,
-		`src="/assets/htmx-2.0.10.min.js"`,
+		`src="/assets/htmx-4.0.0.min.js"`,
 	} {
 		if !strings.Contains(body, expected) {
 			t.Errorf("body does not contain %q", expected)
@@ -1181,7 +1181,7 @@ func TestStaticAssetsAreEmbedded(t *testing.T) {
 	for _, path := range []string{
 		"/assets/app.css", "/assets/menu.js", "/assets/tabs.js",
 		"/assets/register.css", "/assets/register.js", "/assets/tokens.css",
-		"/assets/htmx-2.0.10.min.js",
+		"/assets/htmx-4.0.0.min.js",
 	} {
 		response := request(t, server, http.MethodGet, path, nil)
 		if response.Code != http.StatusOK {
@@ -1192,11 +1192,11 @@ func TestStaticAssetsAreEmbedded(t *testing.T) {
 		}
 	}
 	htmx := request(
-		t, server, http.MethodGet, "/assets/htmx-2.0.10.min.js", nil,
+		t, server, http.MethodGet, "/assets/htmx-4.0.0.min.js", nil,
 	)
 	digest := sha512.Sum384(htmx.Body.Bytes())
 	if got := base64.StdEncoding.EncodeToString(digest[:]); got !=
-		"H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" {
+		"BvJpBiO8Kh31EqtJe5DRIeWrHWnCGkwytKs9NKFi86Hhw96dEqdEMzZDeK9iEGTc" {
 		t.Fatalf("embedded HTMX SHA-384 = %s", got)
 	}
 	if policy := htmx.Header().Get("Content-Security-Policy"); policy == "" ||
@@ -1258,7 +1258,7 @@ func TestPagesRemoveHTMXSettleDelay(t *testing.T) {
 	for _, path := range []string{"/", "/projects/1/flows/1?view=simulation"} {
 		body := request(t, server, http.MethodGet, path, nil).Body.String()
 		config := strings.Index(body, `<meta name="htmx-config" content='{"defaultSettleDelay":0}'>`)
-		htmx := strings.Index(body, `<script src="/assets/htmx-2.0.10.min.js"></script>`)
+		htmx := strings.Index(body, `<script src="/assets/htmx-4.0.0.min.js"></script>`)
 		if config < 0 || htmx < 0 || config > htmx {
 			t.Errorf("%s htmx config=%d script=%d", path, config, htmx)
 		}
