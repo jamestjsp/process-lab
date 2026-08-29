@@ -10,6 +10,56 @@ names describe the HTMX 2 lifecycle used for those samples. The runnable
 benchmark now uses HTMX 4's colon-separated events and its single completed
 `htmx:after:swap` application pass.
 
+## 2026-08-28 HTMX 4 morph and partial follow-up
+
+HTMX 4's `outerMorph` now handles full workbench navigation and every
+workbench-targeted mutation. A successful property edit keeps the main target
+unchanged and routes five explicit `<hx-partial>` updates to project facts,
+the selected block card, simulation results, the inspector, and the tab strip.
+Those partials also use `outerMorph`, so all five targets retain DOM identity.
+
+The adoption rule was fixed before measurement: keep the change only if every
+native-speed workload improved median parameter-edit time by at least 10%, no
+p95 regressed by more than 10%, and the constrained profile did not reverse
+direction. The fair control was exact commit `fdfeaf8`, the HTMX 4 migration
+before morphs and partials. The runs were interleaved control/change/control/
+change, with 20 edits per run, size, and zoom. The benchmark now accepts
+`--expected-edit-swap bounded-morph` and fails if any morph-stable region is
+replaced.
+
+| blocks | zoom | control median / p95 | morph + partial median / p95 | median improvement | re-apply median |
+| --- | --- | --- | --- | --- | --- |
+| 50 | 100% | 9.6 / 14.7 ms | 7.9 / 8.6 ms | 17.7% | 2.1 → 0.8 ms |
+| 50 | 25% | 9.2 / 10.0 ms | 7.9 / 8.5 ms | 14.1% | 1.9 → 0.7 ms |
+| 150 | 100% | 11.4 / 11.9 ms | 10.0 / 10.9 ms | 12.3% | 2.4 → 1.0 ms |
+| 150 | 25% | 11.3 / 13.9 ms | 9.9 / 11.2 ms | 12.4% | 2.3 → 1.0 ms |
+
+At 4× CPU slowdown, the 50-block median improved from 25.8 to 21.3 ms
+(17.4%) at 100% zoom and from 24.2 to 19.0 ms (21.5%) at 25% zoom. The
+corresponding p95 values improved by 22.3% and 18.6%. A combined 150-block
+constrained run timed out at the unrelated authoritative drag gate before it
+could write results, so it is excluded rather than reported as a partial
+sample.
+
+The improvement is DOM work, not transfer: bounded responses remain about
+6.1–6.2 KiB gzip. The swap phase itself is roughly 0.1 ms slower; preserving
+the nodes reduces the application re-apply phase by 1.2–1.4 ms and makes that
+gain larger under CPU throttling. Real-browser regressions separately prove
+that full navigation keeps `#workbench` and `#flow-canvas`, bounded edits keep
+all seven observed stable regions, content changes still land, and Back and
+Forward still use server-backed full-document restoration.
+
+Measurements ran on an Apple M1 Pro MacBook Pro with 16 GB RAM, macOS 26.6.2,
+Chrome 151.0.7922.174, Node 24.10.0, and Go 1.26.4. The native comparison used:
+
+```text
+node docs/swap-scaling-bench.mjs --sizes 50,150 --server-reps 10 --swap-reps 20 --load-reps 7 --expected-edit-swap bounded-morph --skip-profile --skip-redundancy
+```
+
+The constrained comparison added `--sizes 50 --cpu-slowdown 4`. Control runs
+used `--expected-edit-swap bounded` against the archived control with the same
+benchmark fixes.
+
 ## 2026-08-02 performance-refactor baseline
 
 The orthogonal-routing work changed the architecture after the original study:

@@ -116,7 +116,7 @@
   </header>
   <ul class="analysis-notices"><li>{{.Error}}</li></ul>
   {{if .UndoAvailable}}
-  <form method="post" action="{{.UndoPath}}" hx-post="{{.UndoPath}}" hx-target="#workbench" hx-swap="outerHTML">
+  <form method="post" action="{{.UndoPath}}" hx-post="{{.UndoPath}}" hx-target="#workbench" hx-swap="outerMorph">
     <button class="run-button" type="submit">Undo candidate</button>
   </form>
   {{end}}
@@ -167,12 +167,12 @@
 
   <div class="controller-candidate-actions">
     {{if .ApplyAvailable}}
-    <form method="post" action="{{.ApplyPath}}" hx-post="{{.ApplyPath}}" hx-target="#workbench" hx-swap="outerHTML">
+    <form method="post" action="{{.ApplyPath}}" hx-post="{{.ApplyPath}}" hx-target="#workbench" hx-swap="outerMorph">
       <button class="run-button" type="submit">Apply candidate atomically</button>
     </form>
     {{end}}
     {{if .UndoAvailable}}
-    <form method="post" action="{{.UndoPath}}" hx-post="{{.UndoPath}}" hx-target="#workbench" hx-swap="outerHTML">
+    <form method="post" action="{{.UndoPath}}" hx-post="{{.UndoPath}}" hx-target="#workbench" hx-swap="outerMorph">
       <button class="run-button" type="submit">Undo candidate</button>
     </form>
     {{end}}

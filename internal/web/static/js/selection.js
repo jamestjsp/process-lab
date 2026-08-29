@@ -140,7 +140,7 @@ export function deleteSelection() {
   const query = ids.map((id) => `id=${encodeURIComponent(id)}`).join('&')
   htmx.ajax('DELETE', `/flows/${root.dataset.flowId}/blocks?${query}`, {
     target: '#workbench',
-    swap: 'outerHTML'
+    swap: 'outerMorph'
   })
   selection.clear()
   setStatus(`Deleted ${ids.length} block${ids.length === 1 ? '' : 's'}`)
@@ -151,7 +151,7 @@ export function duplicateSelection() {
   if (!root || !selection.size) return
   htmx.ajax('POST', `/flows/${root.dataset.flowId}/blocks/duplicate`, {
     target: '#workbench',
-    swap: 'outerHTML',
+    swap: 'outerMorph',
     values: { id: Array.from(selection) }
   })
   setStatus(`Duplicated ${selection.size} block${selection.size === 1 ? '' : 's'}`)
@@ -163,7 +163,7 @@ export function selectBlock(node) {
   setSelection([node.dataset.blockId])
   htmx.ajax('GET', `/flows/${root.dataset.flowId}/workbench?selected=${node.dataset.blockId}`, {
     target: '#workbench',
-    swap: 'outerHTML'
+    swap: 'outerMorph'
   })
 }
 

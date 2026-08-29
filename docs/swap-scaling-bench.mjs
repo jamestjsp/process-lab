@@ -12,7 +12,7 @@
 //     --swap-reps 15       parameter-edit swaps per size per zoom
 //     --load-reps 7        page loads per size per zoom
 //     --cpu-slowdown 4      Chrome CPU throttling rate (default 1)
-//     --expected-edit-swap full|bounded
+//     --expected-edit-swap full|bounded|bounded-morph
 //                          fail unless parameter edits use that DOM contract
 //     --skip-profile        omit the CDP sampling profile
 //     --skip-redundancy     omit the multi-interaction routing gate
@@ -58,7 +58,7 @@ const USAGE = `Usage: node docs/swap-scaling-bench.mjs [options]
   --swap-reps 15       parameter-edit swaps per size per zoom
   --load-reps 7        page loads per size per zoom
   --cpu-slowdown 4     Chrome CPU throttling rate (default 1)
-  --expected-edit-swap full|bounded
+  --expected-edit-swap full|bounded|bounded-morph
                        Fail unless parameter edits use that DOM contract
   --skip-profile       Omit the CDP sampling profile
   --skip-redundancy    Omit the multi-interaction routing gate
@@ -209,7 +209,10 @@ async function buildFixture(blocks) {
   })
   const location = created.headers.get('location')
   if (!location) throw new Error(`no redirect creating project: ${created.status}`)
-  const [, projectID, flowID] = location.match(/^\/projects\/(\d+)\/flows\/(\d+)$/)
+  const locationPath = new URL(location, base).pathname
+  const locationMatch = locationPath.match(/^\/projects\/(\d+)\/flows\/(\d+)$/)
+  if (!locationMatch) throw new Error(`unexpected project location: ${location}`)
+  const [, projectID, flowID] = locationMatch
 
   const ids = []
   for (let index = 0; index < blocks; index += 1) {
@@ -306,7 +309,7 @@ function decodeEntities(value) {
 async function benchServer(fixture) {
   const { flowID, probe, form } = fixture
   const fragmentURL = `${base}/flows/${flowID}/workbench?selected=${probe}`
-  const pageURL = `${base}/projects/${fixture.projectID}/flows/${flowID}?selected=${probe}`
+  const pageURL = `${base}/projects/${fixture.projectID}/flows/${flowID}?view=simulation&selected=${probe}`
 
   let gain = Number(form.gain ?? 1)
   const editBody = () => {
@@ -377,10 +380,10 @@ async function benchServer(fixture) {
 // ---- browser timings ------------------------------------------------
 
 async function benchBrowser(session, fixture, zoom) {
-  const url = `${base}/projects/${fixture.projectID}/flows/${fixture.flowID}?selected=${fixture.probe}`
+  const url = `${base}/projects/${fixture.projectID}/flows/${fixture.flowID}?view=simulation&selected=${fixture.probe}`
 
-  // The first navigation is the warm-up: it fills the HTTP cache (htmx
-  // itself comes from a CDN) and gives an origin to seed the client
+  // The first navigation is the warm-up: it fills the immutable asset cache
+  // and gives an origin to seed the client
   // state against, so every measured load starts from the same place.
   await navigate(session, url)
   await evaluate(session, `(() => {
@@ -481,7 +484,7 @@ async function benchRedundancy(session, fixture) {
   // would be zero paths against zero paths and prove nothing.
   await fetch(`${base}/flows/${fixture.flowID}/duplicate`, { method: 'POST' })
 
-  const url = `${base}/projects/${fixture.projectID}/flows/${fixture.flowID}?selected=${fixture.probe}`
+  const url = `${base}/projects/${fixture.projectID}/flows/${fixture.flowID}?view=simulation&selected=${fixture.probe}`
   await navigate(session, url)
   await installProbe(session)
 
@@ -497,6 +500,10 @@ async function benchRedundancy(session, fixture) {
     } catch (error) {
       results.push({ kick, error: String(error.message || error) })
     }
+  }
+  const failures = results.filter((result) => result.error)
+  if (failures.length) {
+    throw new Error(`route-authority gate failed: ${JSON.stringify(failures)}`)
   }
   return results
 }
@@ -933,7 +940,9 @@ async function installProbe(session) {
     // every timing measurement is finished.
     const root = () => document.querySelector('#workbench')
     const swapTo = (verb, url, values) => htmx.ajax(verb, url, {
-      target: '#workbench', swap: 'outerHTML', values
+      target: '#workbench',
+      swap: ${JSON.stringify(options.expectedEditSwap === 'bounded-morph' ? 'outerMorph' : 'outerHTML')},
+      values
     })
     const newestBlock = () => Math.max(...Array.from(
       document.querySelectorAll('.block-card'), (node) => Number(node.dataset.blockId)))
@@ -1012,6 +1021,15 @@ function validateEditSwap(edit) {
   if (options.expectedEditSwap === 'full') {
     if (!replaced.workbench) {
       throw new Error(`parameter edit did not replace #workbench: ${JSON.stringify(replaced)}`)
+    }
+    return
+  }
+  if (options.expectedEditSwap === 'bounded-morph') {
+    const changedIdentity = ['workbench', 'card', 'inspector', 'dock', 'tabs', 'facts']
+      .filter((key) => replaced[key])
+    if (changedIdentity.length !== 0) {
+      throw new Error(
+        `parameter edit replaced morph-stable regions: ${JSON.stringify(replaced)}`)
     }
     return
   }
@@ -1306,8 +1324,8 @@ function parseArgs(argv) {
     console.error(`--cpu-slowdown must be a number greater than or equal to 1\n\n${USAGE}`)
     process.exit(2)
   }
-  if (!['full', 'bounded'].includes(parsed.expectedEditSwap)) {
-    console.error(`--expected-edit-swap must be full or bounded\n\n${USAGE}`)
+  if (!['full', 'bounded', 'bounded-morph'].includes(parsed.expectedEditSwap)) {
+    console.error(`--expected-edit-swap must be full, bounded, or bounded-morph\n\n${USAGE}`)
     process.exit(2)
   }
   return parsed
