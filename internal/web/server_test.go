@@ -368,8 +368,20 @@ func TestHTMXBlockUpdateReturnsBoundedAuthoritativeRegions(t *testing.T) {
 	if strings.Contains(body, "<title>") {
 		t.Fatal("bounded response rendered the unchanged document title")
 	}
-	if got := strings.Count(body, `hx-swap-oob="outerHTML"`); got != 5 {
-		t.Fatalf("bounded response has %d out-of-band regions, want 5", got)
+	if got := strings.Count(body, `<hx-partial `); got != 5 {
+		t.Fatalf("bounded response has %d partial regions, want 5", got)
+	}
+	morphingPartials := 0
+	for _, line := range strings.Split(body, "\n") {
+		if strings.Contains(line, `<hx-partial `) && strings.Contains(line, `hx-swap="outerMorph"`) {
+			morphingPartials++
+		}
+	}
+	if morphingPartials != 5 {
+		t.Fatalf("bounded response has %d morphing partials, want 5", morphingPartials)
+	}
+	if strings.Contains(body, `hx-swap-oob`) {
+		t.Fatal("bounded response retained legacy out-of-band swaps")
 	}
 	if got := strings.Count(body, `class="block-card `); got != 1 {
 		t.Fatalf("bounded response rendered %d block cards, want only the selected card", got)

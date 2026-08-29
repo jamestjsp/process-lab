@@ -20,11 +20,18 @@ snapping, no multi-selection, and no way to collapse the side rails.
 
 ## The constraint that shapes everything
 
-HTMX swaps the entire `#workbench` element on nearly every action. Every
-block element, the canvas, and the sheet layer are replaced. **Any state the
-client holds must be re-applied afterwards**, or it silently disappears on
-the next edit. This is the recurring failure mode in this file; three
-separate defects during implementation traced back to it.
+HTMX 4 morphs full `#workbench` responses instead of replacing the target.
+Stable IDs keep the workbench, canvas, and matching descendants connected;
+tab navigation therefore preserves their DOM identity while changing the
+server-owned sheet. Successful property edits are narrower: one response
+contains five `<hx-partial>` elements targeting project facts, the selected
+card, simulation results, inspector, and tab strip, and every partial uses
+`outerMorph`.
+
+The server markup remains authoritative, so **any ephemeral state not
+represented by that markup must still be re-applied afterwards**. Morphing
+removes avoidable node destruction; it does not make viewport, selection,
+shell, chart, or route state durable by itself.
 
 Re-application happens once, on HTMX 4's `htmx:after:swap`:
 
@@ -35,9 +42,9 @@ const restoreViewport = () => {
 document.addEventListener('htmx:after:swap', restoreViewport)
 ```
 
-HTMX 4 completes the main swap, every out-of-band task, and their settle work
+HTMX 4 completes the main swap, every partial task, and their settle work
 before firing `after:swap` once. Back and Forward no longer restore an HTMX
-DOM snapshot: they re-fetch the document and follow the same swap lifecycle,
+DOM snapshot: they re-fetch the document and follow the same morph lifecycle,
 so the same listener rebuilds the final live DOM without a history-only path.
 
 ## Sheet geometry

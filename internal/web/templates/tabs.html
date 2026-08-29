@@ -1,11 +1,11 @@
 {{define "tabs"}}
+{{if .BoundedEdit}}<hx-partial hx-target="#flow-tabs" hx-swap="outerMorph">{{end}}
 <nav
   class="tab-strip"
   id="flow-tabs"
   aria-label="Flowsheets"
   data-overflow="false"
-  data-project-id="{{.Workspace.Project.ID}}"
-  {{if .BoundedEdit}}hx-swap-oob="outerHTML"{{end}}>
+  data-project-id="{{.Workspace.Project.ID}}">
   <button
     type="button"
     class="tab-scroll tab-scroll-back"
@@ -28,7 +28,7 @@
         title="{{.Name}}"
         hx-get="{{.Fragment}}"
         hx-target="#workbench"
-        hx-swap="outerHTML"
+        hx-swap="outerMorph"
         hx-push-url="{{.Href}}">
         <span class="flow-tab-name">{{.Name}}</span>
         {{if .NeedsRun}}<i class="flow-tab-dot" role="img" aria-label="Model changed since its last run"></i>{{end}}
@@ -66,7 +66,7 @@
             {{if .Active}}aria-current="page"{{end}}
             hx-get="{{.Fragment}}"
             hx-target="#workbench"
-            hx-swap="outerHTML"
+            hx-swap="outerMorph"
             hx-push-url="{{.Href}}">
             <span>{{.Name}}</span>
             {{if .NeedsRun}}<i class="flow-tab-dot" role="img" aria-label="Model changed since its last run"></i>{{end}}
@@ -77,4 +77,5 @@
     </details>
   </div>
 </nav>
+{{if .BoundedEdit}}</hx-partial>{{end}}
 {{end}}

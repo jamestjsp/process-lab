@@ -284,7 +284,7 @@
   function request(verb, path, values) {
     return htmx.ajax(verb, path, {
       target: '#workbench',
-      swap: 'outerHTML',
+      swap: 'outerMorph',
       values: values || {}
     })
   }

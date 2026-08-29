@@ -63,9 +63,12 @@ describe("tab navigation", () => {
       assert.equal(await page.evaluate(() => htmx.version), "4.0.0");
       const firstURL = page.url();
       const firstTitle = await page.title();
+      const originalWorkbench = await page.locator("#workbench").elementHandle();
+      const originalCanvas = await page.locator("#flow-canvas").elementHandle();
 
       const otherTab = page.locator(".flow-tab:not([aria-current])").first();
       const otherFlowID = await otherTab.getAttribute("data-flow-tab");
+      assert.equal(await otherTab.getAttribute("hx-swap"), "outerMorph");
       const partialRequest = page.waitForRequest((request) =>
         request.headers()["hx-request-type"] === "partial");
       await otherTab.click();
@@ -76,6 +79,16 @@ describe("tab navigation", () => {
       await page.waitForFunction(
         (id) => document.querySelector("#workbench")?.dataset.flowId === id,
         otherFlowID,
+      );
+      assert.equal(
+        await page.evaluate((node) => node === document.querySelector("#workbench"), originalWorkbench),
+        true,
+        "morph navigation replaced the stable workbench node",
+      );
+      assert.equal(
+        await page.evaluate((node) => node === document.querySelector("#flow-canvas"), originalCanvas),
+        true,
+        "morph navigation replaced the stable canvas node",
       );
 
       const secondURL = page.url();
@@ -111,6 +124,61 @@ describe("tab navigation", () => {
         otherFlowID,
       );
 
+      assert.deepEqual(problems, [], "browser reported failures");
+    } finally {
+      await page.close();
+    }
+  });
+
+  test("bounded edits route morphing partials without replacing the workbench", async () => {
+    const {page, problems} = await openWorkbenchWithTwoSheets();
+    try {
+      await page.locator(".block-body").first().click();
+      await page.locator("form.property-form").waitFor();
+
+      const selectors = [
+        "#workbench",
+        "#flow-canvas",
+        ".block-card.selected",
+        "#inspector-rail",
+        "#simulation-results",
+        "#flow-tabs",
+        "#project-facts",
+      ];
+      const originals = await Promise.all(
+        selectors.map((selector) => page.locator(selector).elementHandle()),
+      );
+      const form = page.locator("form.property-form");
+      const name = form.locator('input[name="name"]');
+      const updatedName = `Morph ${Date.now()}`;
+      await name.fill(updatedName);
+      const responsePromise = page.waitForResponse((response) =>
+        response.request().method() === "PUT" && /\/blocks\/\d+/.test(response.url()));
+      await form.locator('button[type="submit"]').click();
+      const response = await responsePromise;
+      assert.equal(response.status(), 200);
+      const body = await response.text();
+      assert.equal((body.match(/<hx-partial\b/g) || []).length, 5);
+      assert.equal(
+        (body.match(/<hx-partial\b[^>]*hx-swap="outerMorph"/g) || []).length,
+        5,
+      );
+      assert.doesNotMatch(body, /hx-swap-oob/);
+      await page.waitForFunction(
+        (value) => document.querySelector(".block-card.selected strong")?.textContent === value,
+        updatedName,
+      );
+
+      for (let index = 0; index < selectors.length; index += 1) {
+        assert.equal(
+          await page.evaluate(
+            ([node, selector]) => node === document.querySelector(selector),
+            [originals[index], selectors[index]],
+          ),
+          true,
+          `bounded partial replaced ${selectors[index]}`,
+        );
+      }
       assert.deepEqual(problems, [], "browser reported failures");
     } finally {
       await page.close();

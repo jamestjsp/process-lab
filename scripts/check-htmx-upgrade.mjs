@@ -27,7 +27,15 @@ function isMigratedDisable(line) {
   return /\bhx-disable="[^"]+"/.test(openingTag);
 }
 
-const unexpected = findings.filter((line) => !isMigratedDisable(line));
+function isPartialRouting(line) {
+  const match = /^(.+):(\d+): \[inheritance\] hx-(target|swap) /.exec(line);
+  if (!match) return false;
+  const lines = readFileSync(match[1], "utf8").split("\n");
+  return /<hx-partial\b/.test(lines[Number(match[2]) - 1]);
+}
+
+const unexpected = findings.filter((line) =>
+  !isMigratedDisable(line) && !isPartialRouting(line));
 if (unexpected.length || (checker.status !== 0 && findings.length === 0)) {
   process.stderr.write(output);
   process.exit(checker.status || 1);
@@ -35,7 +43,7 @@ if (unexpected.length || (checker.status !== 0 && findings.length === 0)) {
 
 if (findings.length) {
   process.stdout.write(
-    `upgrade-check: ${findings.length} selector-valued HTMX 4 hx-disable false positives ignored\n`,
+    `upgrade-check: ${findings.length} source-verified HTMX 4 false positives ignored\n`,
   );
 } else {
   process.stdout.write("upgrade-check: no HTMX 2 migration findings\n");

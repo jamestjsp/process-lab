@@ -106,7 +106,7 @@ export function finishConnection(button) {
   const root = workbench()
   htmx.ajax('POST', `/flows/${root.dataset.flowId}/connections`, {
     target: '#workbench',
-    swap: 'outerHTML',
+    swap: 'outerMorph',
     values: {
       source_id: connectionSource.id,
       source_port: connectionSource.port,

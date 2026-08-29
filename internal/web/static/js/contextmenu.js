@@ -47,7 +47,7 @@ function paletteChoices(point) {
         if (!root) return
         htmx.ajax('POST', `/flows/${root.dataset.flowId}/blocks`, {
           target: '#workbench',
-          swap: 'outerHTML',
+          swap: 'outerMorph',
           values: {
             kind,
             x: String(Math.round(point.x / grid) * grid),
@@ -76,7 +76,7 @@ function focusInspectorName(node) {
 function disconnectBlock(node) {
   htmx.ajax('DELETE', `/blocks/${node.dataset.blockId}/connections`, {
     target: '#workbench',
-    swap: 'outerHTML'
+    swap: 'outerMorph'
   })
   setStatus('Signal wires removed')
 }
