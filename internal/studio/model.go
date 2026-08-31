@@ -87,6 +87,7 @@ type Parameters struct {
 	Gain              float64   `json:"gain,omitempty"`
 	Signs             string    `json:"signs,omitempty"`
 	SignalWidth       int       `json:"signalWidth,omitempty"`
+	SignalWidthMode   string    `json:"signalWidthMode,omitempty"`
 	TimeConstant      float64   `json:"timeConstant,omitempty"`
 	Numerator         []float64 `json:"numerator,omitempty"`
 	Denominator       []float64 `json:"denominator,omitempty"`
@@ -170,12 +171,13 @@ type Flow struct {
 }
 
 type Block struct {
-	ID         int64
-	FlowID     int64
-	Kind       BlockKind
-	Name       string
-	Position   Point
-	Parameters Parameters
+	ID                  int64
+	FlowID              int64
+	Kind                BlockKind
+	Name                string
+	Position            Point
+	Parameters          Parameters
+	resolvedSignalWidth int
 }
 
 // Connection is one drawn signal. SourcePort and TargetPort are the terminal

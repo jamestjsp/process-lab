@@ -10,6 +10,13 @@ import (
 
 const maxDirectSignalWidth = 16
 
+type signalWidthMode string
+
+const (
+	signalWidthExplicit  signalWidthMode = "explicit"
+	signalWidthInherited signalWidthMode = "inherited"
+)
+
 func normalizedDirectSignalWidth(parameters Parameters) int {
 	if parameters.SignalWidth == 0 {
 		return 1
@@ -17,6 +24,52 @@ func normalizedDirectSignalWidth(parameters Parameters) int {
 	return parameters.SignalWidth
 }
 
+func effectiveDirectSignalWidth(block Block) int {
+	if block.resolvedSignalWidth > 0 {
+		return block.resolvedSignalWidth
+	}
+	return normalizedDirectSignalWidth(block.Parameters)
+}
+
+func normalizedSignalWidthMode(parameters Parameters) signalWidthMode {
+	if parameters.SignalWidthMode == "" {
+		return signalWidthExplicit
+	}
+	return signalWidthMode(parameters.SignalWidthMode)
+}
+
+func inheritableSignalWidthFields() []parameterDefinition {
+	width := activateParameterField(
+		signalWidthField(),
+		parameterActivation("signal_width_mode", string(signalWidthExplicit)),
+	)
+	return []parameterDefinition{
+		{
+			Name: "signal_width_mode", Label: "Signal width source", Type: "select",
+			Options: []parameterOption{
+				{Value: string(signalWidthInherited), Label: "Inherited"},
+				{Value: string(signalWidthExplicit), Label: "Explicit"},
+			},
+			set: func(parameters *Parameters, raw string) error {
+				parameters.SignalWidthMode = strings.ToLower(strings.TrimSpace(raw))
+				return nil
+			},
+			text: func(parameters Parameters) string {
+				return string(normalizedSignalWidthMode(parameters))
+			},
+			Help: "Uses connected upstream width when available.", optional: true,
+		},
+		width,
+	}
+}
+
+func validateInheritableSignalWidth(parameters Parameters) error {
+	mode := normalizedSignalWidthMode(parameters)
+	if mode != signalWidthExplicit && mode != signalWidthInherited {
+		return invalid("signal width mode must be explicit or inherited")
+	}
+	return validateDirectSignalWidth(parameters)
+}
 func signalWidthField() parameterDefinition {
 	return parameterDefinition{
 		Name: "signal_width", Label: "Signal width", Type: "number",
@@ -152,7 +205,10 @@ func unitDelayInitialConditionField() parameterDefinition {
 }
 
 func unitDelayInitialState(parameters Parameters) []float64 {
-	width := normalizedDirectSignalWidth(parameters)
+	return unitDelayInitialStateAtWidth(parameters, normalizedDirectSignalWidth(parameters))
+}
+
+func unitDelayInitialStateAtWidth(parameters Parameters, width int) []float64 {
 	if parameters.InitialState == nil {
 		state := make([]float64, width)
 		for index := range state {
@@ -175,6 +231,9 @@ func validateUnitDelayInitialState(parameters Parameters) error {
 	if err := validateDirectSignalWidth(parameters); err != nil {
 		return err
 	}
+	if normalizedSignalWidthMode(parameters) == signalWidthInherited {
+		return nil
+	}
 	if parameters.InitialState == nil {
 		return nil
 	}
@@ -189,13 +248,13 @@ func validateUnitDelayInitialState(parameters Parameters) error {
 	return nil
 }
 
-func realizeVectorUnitDelay(parameters Parameters) (*controlsys.System, error) {
-	width := normalizedDirectSignalWidth(parameters)
+func realizeVectorUnitDelay(block Block) (*controlsys.System, error) {
+	width := effectiveDirectSignalWidth(block)
 	return controlsys.New(
 		mat.NewDense(width, width, nil),
 		identityDense(width),
 		identityDense(width),
 		mat.NewDense(width, width, nil),
-		parameters.SampleTime,
+		block.Parameters.SampleTime,
 	)
 }

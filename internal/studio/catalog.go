@@ -832,13 +832,26 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 			Kind: BlockGain, Label: "Gain", Category: "Math",
 			Description: "Scale a signal", Glyph: "×", Tag: "MATH",
 		},
-		Defaults: Parameters{Gain: 1},
-		Parameters: []parameterDefinition{
+		Defaults: Parameters{
+			Gain: 1, SignalWidth: 1,
+			SignalWidthMode: string(signalWidthInherited),
+		},
+		Parameters: append([]parameterDefinition{
 			numberField("gain", "Gain", "gain", "0.05", -10000, 10000, "scalar", func(p *Parameters) *float64 { return &p.Gain }),
+		}, inheritableSignalWidthFields()...),
+		portSchema: func(parameters Parameters) blockPortSchema {
+			width := normalizedDirectSignalWidth(parameters)
+			return directSignalPortSchema(1, width, width)
 		},
 		realize: func(block Block, _ []int) (*controlsys.System, error) {
-			return controlsys.NewGain(mat.NewDense(1, 1, []float64{block.Parameters.Gain}), 0)
+			width := effectiveDirectSignalWidth(block)
+			values := make([]float64, width*width)
+			for channel := range width {
+				values[channel*width+channel] = block.Parameters.Gain
+			}
+			return controlsys.NewGain(mat.NewDense(width, width, values), 0)
 		},
+		validate: validateInheritableSignalWidth,
 		summary: func(parameters Parameters) string {
 			return fmt.Sprintf("K = %.3g", parameters.Gain)
 		},
@@ -1795,18 +1808,18 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 		Defaults: Parameters{
 			InitialCondition: 0,
 			SignalWidth:      1,
+			SignalWidthMode:  string(signalWidthInherited),
 			SampleTime:       0.1, SampleTimeMode: string(sampleTimeExplicit),
 		},
-		Parameters: append([]parameterDefinition{
+		Parameters: append(append([]parameterDefinition{
 			unitDelayInitialConditionField(),
-			signalWidthField(),
-		}, sampleTimeFields()...),
+		}, inheritableSignalWidthFields()...), sampleTimeFields()...),
 		portSchema: func(parameters Parameters) blockPortSchema {
 			width := normalizedDirectSignalWidth(parameters)
 			return directSignalPortSchema(1, width, width)
 		},
 		realize: func(block Block, _ []int) (*controlsys.System, error) {
-			return realizeVectorUnitDelay(block.Parameters)
+			return realizeVectorUnitDelay(block)
 		},
 		initialState: func(parameters Parameters) []float64 {
 			return unitDelayInitialState(parameters)
@@ -1816,6 +1829,9 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 		},
 		validate: func(parameters Parameters) error {
 			if err := validateDiscreteSampleTime(parameters); err != nil {
+				return err
+			}
+			if err := validateInheritableSignalWidth(parameters); err != nil {
 				return err
 			}
 			return validateUnitDelayInitialState(parameters)

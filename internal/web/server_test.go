@@ -306,6 +306,73 @@ func TestWorkbenchRendersNamedVectorPortWidth(t *testing.T) {
 	}
 }
 
+func TestWorkbenchRendersInheritedSignalWidth(t *testing.T) {
+	server, _ := openTestServer(t)
+	service, err := studio.Open(context.Background(), ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+	ctx := context.Background()
+	current, err := service.CurrentWorkspace(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := service.CreateFlow(ctx, current.Project.ID, "Inherited width")
+	if err != nil {
+		t.Fatal(err)
+	}
+	flowID := created.Snapshot.Flow.ID
+	_, sourceID, err := service.AddBlock(
+		ctx, flowID, studio.BlockVectorConstant, studio.Point{X: 100, Y: 100},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.UpdateBlock(ctx, sourceID, studio.BlockUpdate{
+		Name: "Vector source",
+		Parameters: map[string]string{
+			"vector": "1, 2, 3", "output_names": "one, two, three",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, gainID, err := service.AddBlock(
+		ctx, flowID, studio.BlockGain, studio.Point{X: 350, Y: 100},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := service.Connect(ctx, flowID, studio.Wire{
+		SourceID: sourceID, TargetID: gainID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace := studio.Workspace{
+		Project:  current.Project,
+		Flows:    []studio.Flow{snapshot.Flow},
+		Snapshot: snapshot,
+	}
+	view := newWorkbenchView(workspace, gainID, "")
+	var page strings.Builder
+	if err := server.templates.ExecuteTemplate(&page, "workbench", view); err != nil {
+		t.Fatal(err)
+	}
+	body := page.String()
+	for _, want := range []string{
+		`input port 1 (3 channels`,
+		`output port 1 (3 channels`,
+		`name="signal_width_mode"`,
+		`value="inherited" selected`,
+		`name="signal_width"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("rendered inherited Gain does not contain %q", want)
+		}
+	}
+}
+
 // TestWorkbenchPageRendersTheShell keeps the workbench page covered now that
 // `/` no longer leads to it.
 func TestWorkbenchPageRendersTheShell(t *testing.T) {

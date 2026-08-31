@@ -790,56 +790,16 @@ func (s *Studio) snapshot(ctx context.Context, flowID int64) (Snapshot, error) {
 	snapshot.Flow.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
 	snapshot.Flow.ModelUpdatedAt, _ = time.Parse(time.RFC3339Nano, modelUpdated)
 
+	snapshot.Blocks, snapshot.Connections, err = loadModelGraph(ctx, s.db, flowID)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	snapshot.Blocks, err = resolveModelSignalWidths(snapshot.Blocks, snapshot.Connections)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("resolve signal widths: %w", err)
+	}
+
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, flow_id, kind, name, x, y, parameters_json
-		FROM blocks WHERE flow_id = ? ORDER BY id`, flowID)
-	if err != nil {
-		return Snapshot{}, fmt.Errorf("load blocks: %w", err)
-	}
-	for rows.Next() {
-		var block Block
-		var encoded string
-		if err := rows.Scan(
-			&block.ID, &block.FlowID, &block.Kind, &block.Name,
-			&block.Position.X, &block.Position.Y, &encoded,
-		); err != nil {
-			rows.Close()
-			return Snapshot{}, fmt.Errorf("scan block: %w", err)
-		}
-		block.Parameters, err = decodeParameters(block.Kind, encoded)
-		if err != nil {
-			rows.Close()
-			return Snapshot{}, fmt.Errorf("decode parameters for %s: %w", block.Name, err)
-		}
-		snapshot.Blocks = append(snapshot.Blocks, block)
-	}
-	if err := rows.Close(); err != nil {
-		return Snapshot{}, fmt.Errorf("close blocks: %w", err)
-	}
-
-	rows, err = s.db.QueryContext(ctx, `
-		SELECT id, flow_id, source_id, source_port, target_id, target_port
-		FROM connections WHERE flow_id = ? ORDER BY id`, flowID)
-	if err != nil {
-		return Snapshot{}, fmt.Errorf("load connections: %w", err)
-	}
-	for rows.Next() {
-		var connection Connection
-		if err := rows.Scan(
-			&connection.ID, &connection.FlowID,
-			&connection.SourceID, &connection.SourcePort,
-			&connection.TargetID, &connection.TargetPort,
-		); err != nil {
-			rows.Close()
-			return Snapshot{}, fmt.Errorf("scan connection: %w", err)
-		}
-		snapshot.Connections = append(snapshot.Connections, connection)
-	}
-	if err := rows.Close(); err != nil {
-		return Snapshot{}, fmt.Errorf("close connections: %w", err)
-	}
-
-	rows, err = s.db.QueryContext(ctx, `
 		SELECT id, message, created_at FROM events
 		WHERE flow_id = ? ORDER BY id DESC LIMIT 8`, flowID)
 	if err != nil {

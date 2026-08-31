@@ -9,17 +9,27 @@
       "compatibility": "direct-counterpart",
       "supportedSubset": "Double-precision scalar and one-dimensional vector addition or subtraction, numeric input-count shorthand, elementwise equal-width multi-input vectors, and all-elements reduction for a one-port vector.",
       "intentionalDeviations": [
-        "Process Lab authors signal width explicitly because it does not yet implement diagram-wide inherited dimension propagation.",
+        "Process Lab authors direct Sum width explicitly; Sum input expansion and reduction are outside the bounded shape-preserving inheritance family.",
         "Mixed scalar and vector input expansion, matrices, spacer characters, specified-dimension reduction, data-type accumulation policy, saturation, and fixed-point behavior are outside this subset."
+      ]
+    },
+    {
+      "processLabBlock": "gain",
+      "mathWorksBlock": "Gain",
+      "compatibility": "direct-counterpart",
+      "supportedSubset": "A scalar gain applied to scalar or one-dimensional vector input, with newly authored width inherited forward from model context or explicitly authored within the 16-channel limit.",
+      "intentionalDeviations": [
+        "Inherited dimensions are bounded to forward one-dimensional propagation through Gain and Unit Delay; matrices, rank, orientation, backward inference, and variable-size signals are outside this subset.",
+        "Matrix Gain remains the separate explicitly named MIMO specialization."
       ]
     },
     {
       "processLabBlock": "unit_delay",
       "mathWorksBlock": "Unit Delay",
       "compatibility": "direct-counterpart",
-      "supportedSubset": "Scalar or one-dimensional vector signals delayed by one explicit or run-inherited sample period, with scalar-broadcast or width-matched finite initial conditions.",
+      "supportedSubset": "Scalar or one-dimensional vector signals delayed by one explicit or run-inherited sample period, with forward inherited or explicit signal width and scalar-broadcast or width-matched finite initial conditions.",
       "intentionalDeviations": [
-        "Process Lab authors vector width explicitly instead of inheriting signal dimensions.",
+        "Inherited dimensions are bounded to forward one-dimensional propagation through Gain and Unit Delay; matrices, rank, orientation, backward inference, and variable-size signals are outside this subset.",
         "Frame-based processing, data types other than double, state naming, and code-generation options are outside this subset."
       ]
     },
@@ -135,6 +145,19 @@
       "oracle": {
         "kind": "mathworks-formula-analytic",
         "description": "Expected first-period vector history and subsequent delayed samples follow the documented one-sample contract; they are not MATLAB or Simulink output."
+      }
+    },
+    {
+      "id": "shape-preserving-forward-dimension-propagation",
+      "reference": {
+        "title": "Determine Signal Dimensions",
+        "url": "https://www.mathworks.com/help/simulink/ug/determining-output-signal-dimensions.html",
+        "section": "Nonsource blocks and scalar expansion",
+        "accessed": "2026-08-30"
+      },
+      "oracle": {
+        "kind": "mathworks-formula-analytic",
+        "description": "Vector Constant to scalar Gain to Unit Delay exercises the documented shape-preserving direction and scalar expansion contract; expected Process Lab values are analytic, not MATLAB or Simulink output."
       }
     }
   ],

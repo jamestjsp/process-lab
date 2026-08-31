@@ -345,7 +345,7 @@ Flags:
 | `constant` | Constant | Sources | Constant signal | value |
 | `vector_constant` | Vector Constant | Sources | Named constant vector | vector, output_names |
 | `sine` | Sine Wave | Sources | Biased sinusoid | amplitude, bias, frequency, phase |
-| `gain` | Gain | Math | Scale a signal | gain |
+| `gain` | Gain | Math | Scale a signal | gain, signal_width_mode, signal_width |
 | `matrix_gain` | Matrix Gain | Math | Named vector gain y = Du | d, input_names, output_names |
 | `mux` | Mux | Routing | Assemble named scalar channels | output_names |
 | `demux` | Demux | Routing | Decompose a named vector | input_names |
@@ -363,7 +363,7 @@ Flags:
 | `mimo_transfer` | MIMO Transfer Function | Models | Named transfer matrix with row denominators and pairwise delays | transfer_numerators, transfer_denominators, transfer_delays, input_names, output_names, time_domain, sample_time |
 | `zpk` | Zero-Pole-Gain | Models | Named MIMO zero-pole-gain model | zeros, poles, d, input_names, output_names, time_domain, sample_time |
 | `frd` | Frequency Response Data | Models | Named complex MIMO samples for frequency-domain workflows | input_names, output_names, frequencies, frequency_response, frequency_unit, response_unit, time_domain, sample_time |
-| `unit_delay` | Unit Delay | Discrete | Exact one-sample memory | initial_condition, signal_width, sample_time_mode, sample_time |
+| `unit_delay` | Unit Delay | Discrete | Exact one-sample memory | initial_condition, signal_width_mode, signal_width, sample_time_mode, sample_time |
 | `discrete_transfer` | Discrete Transfer Function | Discrete | Proper SISO model in z | numerator, denominator, sample_time_mode, sample_time |
 | `discrete_state_space` | Discrete State-Space | Discrete | Named x[k+1]=Ax+Bu, y=Cx+Du | a, b, c, d, initial_state, input_names, output_names, state_names, sample_time_mode, sample_time |
 | `discretized_transfer` | Discretized Transfer | Discrete | Explicit continuous-to-discrete conversion | numerator, denominator, conversion_method, sample_time_mode, sample_time |

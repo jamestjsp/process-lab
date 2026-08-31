@@ -215,3 +215,147 @@ func TestApplyFlowReconcilesGraphDryRunsAndRejectsAtomically(t *testing.T) {
 		t.Fatal("invalid document changed the flowsheet")
 	}
 }
+func TestApplyFlowPreservesInheritedSignalWidthIntent(t *testing.T) {
+	service := openTestStudio(t, ":memory:")
+	ctx := context.Background()
+	current, err := service.CurrentWorkspace(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	empty, err := service.CreateFlow(ctx, current.Project.ID, "Inherited widths")
+	if err != nil {
+		t.Fatal(err)
+	}
+	document := FlowDocument{
+		Version: 1,
+		Blocks: []DocumentBlock{
+			{
+				Name: "Vector input", Kind: BlockVectorConstant,
+				Position: DocumentPosition{X: 100, Y: 100},
+				Parameters: map[string]string{
+					"vector": "1, 2, 3", "output_names": "channel 1, channel 2, channel 3",
+				},
+			},
+			{
+				Name: "Inherited gain", Kind: BlockGain,
+				Position: DocumentPosition{X: 350, Y: 100},
+				Parameters: map[string]string{
+					"gain": "2", "signal_width_mode": "inherited", "signal_width": "1",
+				},
+			},
+			{
+				Name: "Inherited memory", Kind: BlockUnitDelay,
+				Position: DocumentPosition{X: 600, Y: 100},
+				Parameters: map[string]string{
+					"initial_condition": "9",
+					"signal_width_mode": "inherited",
+					"signal_width":      "1",
+					"sample_time_mode":  "explicit",
+					"sample_time":       "0.1",
+				},
+			},
+			{
+				Name: "Vector output", Kind: BlockVectorScope,
+				Position: DocumentPosition{X: 850, Y: 100},
+				Parameters: map[string]string{
+					"input_names": "channel 1, channel 2, channel 3",
+				},
+			},
+		},
+		Wires: []DocumentWire{
+			{Source: "Vector input", Target: "Inherited gain"},
+			{Source: "Inherited gain", Target: "Inherited memory"},
+			{Source: "Inherited memory", Target: "Vector output"},
+		},
+	}
+	result, snapshot, err := service.ApplyFlow(
+		ctx, empty.Snapshot.Flow.ID, document, false,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Changed || len(snapshot.Connections) != 3 {
+		t.Fatalf("apply result = %#v, connections = %d", result, len(snapshot.Connections))
+	}
+	for _, name := range []string{"Inherited gain", "Inherited memory"} {
+		block := findBlockByName(t, snapshot.Blocks, name)
+		input, _ := block.InputPort(0)
+		output, _ := block.OutputPort(0)
+		if input.Width != 3 || output.Width != 3 {
+			t.Fatalf("%s ports = input %#v output %#v", name, input, output)
+		}
+	}
+
+	dumped, err := service.DumpFlow(ctx, empty.Snapshot.Flow.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"Inherited gain", "Inherited memory"} {
+		var parameters map[string]string
+		for _, block := range dumped.Blocks {
+			if block.Name == name {
+				parameters = block.Parameters
+				break
+			}
+		}
+		if parameters["signal_width_mode"] != "inherited" ||
+			parameters["signal_width"] != "1" {
+			t.Fatalf("%s authored width parameters = %#v", name, parameters)
+		}
+	}
+	roundTrip, _, err := service.ApplyFlow(
+		ctx, empty.Snapshot.Flow.ID, dumped, false,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if roundTrip.Changed {
+		t.Fatalf("inherited-width document round trip = %#v, want no change", roundTrip)
+	}
+
+	beforeConflict, err := service.Snapshot(ctx, empty.Snapshot.Flow.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gain := findBlockByName(t, beforeConflict.Blocks, "Inherited gain")
+	if _, err := service.UpdateBlock(ctx, gain.ID, BlockUpdate{
+		Name: gain.Name,
+		Parameters: map[string]string{
+			"gain": "2", "signal_width_mode": "explicit", "signal_width": "2",
+		},
+	}); err == nil ||
+		!strings.Contains(err.Error(), "3 channels") ||
+		!strings.Contains(err.Error(), "2 channels") {
+		t.Fatalf("conflicting width edit error = %v", err)
+	}
+	afterEdit, err := service.Snapshot(ctx, empty.Snapshot.Flow.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(beforeConflict, afterEdit) {
+		t.Fatal("conflicting width edit changed the flowsheet")
+	}
+
+	for index := range dumped.Blocks {
+		if dumped.Blocks[index].Name == "Inherited gain" {
+			dumped.Blocks[index].Parameters["signal_width_mode"] = "explicit"
+			dumped.Blocks[index].Parameters["signal_width"] = "2"
+		}
+	}
+	for _, dryRun := range []bool{true, false} {
+		if _, _, err := service.ApplyFlow(
+			ctx, empty.Snapshot.Flow.ID, dumped, dryRun,
+		); err == nil ||
+			!strings.Contains(err.Error(), "3 channels") ||
+			!strings.Contains(err.Error(), "2 channels") {
+			t.Fatalf("conflicting width document dry-run %v error = %v", dryRun, err)
+		}
+		afterDocument, err := service.Snapshot(ctx, empty.Snapshot.Flow.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(beforeConflict, afterDocument) {
+			t.Fatalf("conflicting width document dry-run %v changed the flowsheet", dryRun)
+		}
+	}
+}
