@@ -44,6 +44,30 @@ Fixtures label expected results with one of these values:
 Analytic and `controlsys` values are generated reference values. They are not
 MATLAB or Simulink output and must not be described as such.
 
+## Closed model, delay, source, and result-sink classifications
+
+The remaining model, delay, source, and sink candidates were rechecked against
+the official R2026a-oriented online pages on 2026-08-31. They are closed as the
+following direct subsets or intentional Process Lab specializations rather than
+an active parity backlog:
+
+| Area | Process Lab policy | Classification |
+| --- | --- | --- |
+| Transfer functions and state models | Transfer Function remains a proper, zero-initial-state SISO block. MIMO Transfer Function provides named per-channel numerators, output-row denominators, and pairwise delays; State-Space provides named MIMO matrices and finite initial state. | Keep the existing blocks. A second direct SIMO/matrix Transfer Fcn surface would duplicate the named MIMO alternative, while nonzero transfer-function initial conditions belong in State-Space. |
+| Transport delay | Exact Transport Delay remains scalar, carries a finite scalar initial output, and requires alignment to the run grid. Padé and Thiran remain explicit approximation choices; MIMO Transfer Function owns named pairwise path delays. | Keep the exact aligned contract. Vector/matrix Transport Delay parameters and continuous fractional-delay interpolation remain deferred unless concrete user value justifies changing that contract. |
+| Sources | Step is the documented scalar counterpart. Constant, Vector Constant, and Sine Wave are deterministic Process Lab excitation generators; Vector Constant also owns explicit channel names. | Sufficient source classification, not a claim of full Simulink source-library parity. |
+| Scope and Vector Scope | These blocks select scalar or named-vector simulation outputs, then persist series and metrics for the workbench. | Intentional persisted-result sinks, not copies of the interactive Simulink Scope window, simulation controls, measurements, or display configuration. |
+| Spectrum Analyzer | The sink persists a Hann-windowed, one-sided amplitude spectrum for one real simulation signal. | Intentional Process Lab analysis, distinct from DSP System Toolbox power or power-density estimation, filter-bank/Welch choices, averaging, measurements, and spectrogram UI. |
+
+The classifications follow the official
+[Transfer Fcn](https://www.mathworks.com/help/simulink/slref/transferfcn.html),
+[State-Space](https://www.mathworks.com/help/simulink/slref/statespace.html),
+[Transport Delay](https://www.mathworks.com/help/simulink/slref/transportdelay.html),
+[Scope](https://www.mathworks.com/help/simulink/slref/scope.html), and
+[spectrumAnalyzer](https://www.mathworks.com/help/dsp/ref/spectrumanalyzer.html)
+contracts. Existing executable fixtures and focused tests remain the behavioral
+evidence; this classification adds no unverified MATLAB-generated values.
+
 ## Initial MIMO delay subset
 
 For a continuous MIMO transfer model, MathWorks defines `IODelay` as an
@@ -57,10 +81,11 @@ named inputs, and named vector outputs. Its response is checked through the
 public Studio run and persisted result series against independently calculated
 shifted step responses.
 
-This slice intentionally retains Process Lab’s current requirements that exact
+This slice intentionally retains Process Lab's requirements that exact
 continuous delays align with the run sample time and discrete delays are integer
-sample counts. It does not add vector Transport Delay parameters, initial
-history, interpolation, new editor fields, or schema migrations.
+sample counts. It does not add a vector-valued Transport Delay surface,
+continuous fractional-delay interpolation, new editor fields, or schema
+migrations. Exact scalar Transport Delay history is covered below.
 
 ## Direct scalar state subset
 
@@ -74,10 +99,11 @@ semantics that do not change block topology:
 - Unit Delay supports a finite scalar initial output for the first sample
   period.
 
-This subset does not add reset, saturation, external initial-condition ports,
-state ports, vector state, or solver configuration. Unit Delay retains Process
-Lab's explicit 0.1 second new-block sample-time default. When inherited mode is
-authored, compilation follows MathWorks' documented
+Integrator remains scalar and does not add reset, saturation, external
+initial-condition ports, state ports, or solver configuration. Unit Delay's
+bounded inherited vector-width contract is described below. Unit Delay retains
+Process Lab's explicit 0.1 second new-block sample-time default. When inherited
+mode is authored, compilation follows MathWorks' documented
 [forward and backward sample-time propagation](https://www.mathworks.com/help/simulink/ug/how-propagation-affects-inherited-sample-times.html):
 a unique explicit discrete rate propagates transitively through rate-neutral and
 inherited-discrete blocks. Unresolved regions retain the run-step fallback.
