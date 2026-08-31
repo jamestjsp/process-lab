@@ -175,6 +175,53 @@ func TestFrequencyAnalysisCapsAutomaticDiscreteGridAtNyquist(t *testing.T) {
 	}
 }
 
+func TestFrequencyAnalysisResolvesInheritedRatesFromConnectedModelContext(t *testing.T) {
+	tests := []struct {
+		name       string
+		filterMode sampleTimeMode
+		plantMode  sampleTimeMode
+	}{
+		{name: "forward", filterMode: sampleTimeExplicit, plantMode: sampleTimeInherited},
+		{name: "backward", filterMode: sampleTimeInherited, plantMode: sampleTimeExplicit},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			filter := defaultParameters(BlockDiscreteTransfer)
+			filter.SampleTime = 0.2
+			filter.SampleTimeMode = string(test.filterMode)
+			plant := defaultParameters(BlockDiscreteStateSpace)
+			plant.SampleTime = 0.2
+			plant.SampleTimeMode = string(test.plantMode)
+			result, err := analyzeFrequency(
+				[]Block{
+					{ID: 1, Kind: BlockSource, Name: "Input", Parameters: Parameters{Amplitude: 1}},
+					{ID: 2, Kind: BlockDiscreteTransfer, Name: "Filter", Parameters: filter},
+					{ID: 3, Kind: BlockGain, Name: "Gain", Parameters: Parameters{Gain: 1}},
+					{ID: 4, Kind: BlockDiscreteStateSpace, Name: "Plant", Parameters: plant},
+				},
+				[]Connection{
+					{SourceID: 3, TargetID: 4},
+					{SourceID: 2, TargetID: 3},
+					{SourceID: 1, TargetID: 2},
+				},
+				FrequencyAnalysisRequest{
+					Inputs:  []ChannelRef{{BlockID: 1}},
+					Outputs: []ChannelRef{{BlockID: 4}},
+					Omega:   []float64{1, 2},
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantNyquist := math.Pi / 0.2
+			if result.Grid.DiscreteNyquist == nil ||
+				math.Abs(*result.Grid.DiscreteNyquist-wantNyquist) > 1e-12 {
+				t.Fatalf("discrete grid = %#v, want Nyquist %g", result.Grid, wantNyquist)
+			}
+		})
+	}
+}
+
 func TestFrequencyAnalysisLimitsChannelAxesAndTraceProduct(t *testing.T) {
 	inputs := make([]ChannelRef, maxAnalysisChannelsPerAxis+1)
 	outputs := []ChannelRef{{BlockID: 1}}

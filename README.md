@@ -291,9 +291,9 @@ representative fixtures—is in
 | Models | Zero-Pole-Gain | Per-channel zeros, poles, and finite gain matrix | One named vector input |
 | Models | Frequency Response Data | Named complex MIMO samples on an explicit rad/s grid | Frequency-domain workflows only |
 | Discrete | Unit Delay | Exact one-sample scalar or vector state at an explicit or inherited rate | Exactly one |
-| Discrete | Transfer Function | Proper SISO numerator/denominator model in `z` | Exactly one |
-| Discrete | State-Space | Named MIMO `x[k+1]=Ax[k]+Bu[k]`, `y[k]=Cx[k]+Du[k]` | One named vector input |
-| Discrete | Discretized Transfer | Explicit ZOH, FOH, matched pole-zero, or impulse-invariant conversion | Exactly one |
+| Discrete | Transfer Function | Proper SISO numerator/denominator model in `z` at an explicit or inherited rate | Exactly one |
+| Discrete | State-Space | Named MIMO `x[k+1]=Ax[k]+Bu[k]`, `y[k]=Cx[k]+Du[k]` at an explicit or inherited rate | One named vector input |
+| Discrete | Discretized Transfer | ZOH, FOH, matched pole-zero, or impulse-invariant conversion at an explicit or inherited rate | Exactly one |
 | Sinks | Scope | Plots the time-domain signal and response metrics | Exactly one |
 | Sinks | Vector Scope | Plots named vector channels | One vector input |
 | Sinks | Spectrum Analyzer | Hann-windowed one-sided amplitude spectrum using Gonum FFT | Exactly one |
@@ -333,15 +333,19 @@ continuous rational model, while Thiran is a discrete all-pass model with its
 own sample time. Stored delays created before these choices existed retain
 their historical Padé behavior.
 
-Discrete blocks declare an explicit or inherited sample time. An inherited
-Unit Delay first resolves from a connected upstream discrete rate, including
-through a chain of inherited Unit Delays. When no upstream discrete rate is
-available, it retains the existing run-step fallback. Unit Delay carries its
-state exactly between samples. Discrete Transfer Function
-and State-Space blocks are realized directly at their declared `Dt`.
-Discretized Transfer makes conversion a visible model choice—ZOH, FOH,
-matched pole-zero, or impulse invariant—rather than silently choosing a
-method during compilation.
+Discrete blocks declare an explicit or inherited sample time. During
+compilation, a unique connected explicit rate propagates both forward and
+backward through rate-neutral and inherited-discrete blocks, matching the
+documented [model-context propagation process](https://www.mathworks.com/help/simulink/ug/how-propagation-affects-inherited-sample-times.html).
+The shared resolver covers Unit Delay, Discrete Transfer Function, Discrete
+State-Space, Discretized Transfer, and discrete Thiran delay. A region without
+an explicit anchor retains the run-step fallback; conflicting anchors are
+rejected because general multirate execution is not yet supported. Authored
+inherited modes remain intact in persistence and fidelity provenance. Unit
+Delay carries its state exactly between samples. Discrete Transfer Function
+and State-Space blocks are realized directly at the resolved `Dt`. Discretized
+Transfer makes conversion a visible model choice—ZOH, FOH, matched pole-zero,
+or impulse invariant—rather than silently choosing a method during compilation.
 
 Every stored run includes a fidelity record: base step, model domain, driver,
 segment count, source hold, discrete block rates, rate transitions, and delay

@@ -2,6 +2,7 @@ package studio
 
 import (
 	"math"
+	"sort"
 )
 
 type timeDomainKind string
@@ -52,10 +53,14 @@ func resolveModelSampleTimes(
 	baseStep float64,
 ) ([]Block, map[int64]float64, error) {
 	blockByID := make(map[int64]Block, len(blocks))
+	domainByID := make(map[int64]blockTimeDomain, len(blocks))
+	orderedIDs := make([]int64, 0, len(blocks))
 	resolved := make(map[int64]float64)
 	for _, block := range blocks {
 		blockByID[block.ID] = block
+		orderedIDs = append(orderedIDs, block.ID)
 		domain := blockDefinitions[block.Kind].domain(block.Parameters)
+		domainByID[block.ID] = domain
 		if domain.kind != timeDomainDiscrete || domain.sampleTime.mode != sampleTimeExplicit {
 			continue
 		}
@@ -65,27 +70,82 @@ func resolveModelSampleTimes(
 		}
 		resolved[block.ID] = sampleTime
 	}
+	sort.Slice(orderedIDs, func(i, j int) bool { return orderedIDs[i] < orderedIDs[j] })
 
-	for {
-		changed := false
-		for _, connection := range connections {
-			target := blockByID[connection.TargetID]
-			if target.Kind != BlockUnitDelay ||
-				normalizedSampleTimeMode(target.Parameters) != sampleTimeInherited {
-				continue
-			}
-			if _, ok := resolved[target.ID]; ok {
-				continue
-			}
-			sampleTime, ok := resolved[connection.SourceID]
-			if !ok {
-				continue
-			}
-			resolved[target.ID] = sampleTime
-			changed = true
+	neighbors := make(map[int64][]int64, len(blocks))
+	for _, connection := range connections {
+		source, sourceOK := domainByID[connection.SourceID]
+		target, targetOK := domainByID[connection.TargetID]
+		if !sourceOK || !targetOK ||
+			source.kind == timeDomainContinuous ||
+			target.kind == timeDomainContinuous {
+			continue
 		}
-		if !changed {
-			break
+		neighbors[connection.SourceID] = append(
+			neighbors[connection.SourceID], connection.TargetID,
+		)
+		neighbors[connection.TargetID] = append(
+			neighbors[connection.TargetID], connection.SourceID,
+		)
+	}
+	for blockID := range neighbors {
+		sort.Slice(neighbors[blockID], func(i, j int) bool {
+			return neighbors[blockID][i] < neighbors[blockID][j]
+		})
+	}
+
+	type anchor struct {
+		blockID    int64
+		sampleTime float64
+	}
+	visited := make(map[int64]bool, len(blocks))
+	for _, start := range orderedIDs {
+		if visited[start] || domainByID[start].kind == timeDomainContinuous {
+			continue
+		}
+		visited[start] = true
+		queue := []int64{start}
+		var anchors []anchor
+		var inherited []int64
+		for len(queue) > 0 {
+			blockID := queue[0]
+			queue = queue[1:]
+			domain := domainByID[blockID]
+			if domain.kind == timeDomainDiscrete {
+				switch domain.sampleTime.mode {
+				case sampleTimeExplicit:
+					anchors = append(anchors, anchor{
+						blockID: blockID, sampleTime: resolved[blockID],
+					})
+				case sampleTimeInherited:
+					inherited = append(inherited, blockID)
+				}
+			}
+			for _, neighbor := range neighbors[blockID] {
+				if visited[neighbor] {
+					continue
+				}
+				visited[neighbor] = true
+				queue = append(queue, neighbor)
+			}
+		}
+		if len(anchors) == 0 || len(inherited) == 0 {
+			continue
+		}
+		selected := anchors[0]
+		for _, candidate := range anchors[1:] {
+			if compareSampleTimes(selected.sampleTime, candidate.sampleTime).relation == sampleTimesEqual {
+				continue
+			}
+			return nil, nil, invalid(
+				"%s inherits from conflicting explicit sample times: %s uses %.12g s and %s uses %.12g s; use one discrete sample time",
+				blockByID[inherited[0]].Name,
+				blockByID[selected.blockID].Name, selected.sampleTime,
+				blockByID[candidate.blockID].Name, candidate.sampleTime,
+			)
+		}
+		for _, blockID := range inherited {
+			resolved[blockID] = selected.sampleTime
 		}
 	}
 

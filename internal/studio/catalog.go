@@ -1487,7 +1487,7 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 				Name: "sample_time_mode", Label: "Sample time source", Type: "select",
 				Options: []parameterOption{
 					{Value: string(sampleTimeExplicit), Label: "Explicit"},
-					{Value: string(sampleTimeInherited), Label: "Inherit run sample time"},
+					{Value: string(sampleTimeInherited), Label: "Inherited"},
 				},
 				set: func(parameters *Parameters, raw string) error {
 					parameters.SampleTimeMode = strings.ToLower(strings.TrimSpace(raw))
@@ -1496,7 +1496,7 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 				text: func(parameters Parameters) string {
 					return string(normalizedSampleTimeMode(parameters))
 				},
-				Help: "Used by the discrete Thiran representation.",
+				Help: "The discrete Thiran representation uses connected model context, then falls back to the run sample time.",
 			},
 			conditionalNumberField(
 				"sample_time", "Approximation sample time", "sample time",
@@ -1526,7 +1526,7 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 				return controlsys.PadeDelay(block.Parameters.Delay, block.Parameters.Approximation)
 			case delayModeThiran:
 				if normalizedSampleTimeMode(block.Parameters) == sampleTimeInherited {
-					return nil, invalid("inherited Thiran sample time must be resolved from the run sample time")
+					return nil, invalid("inherited Thiran sample time must be resolved before realization")
 				}
 				return controlsys.ThiranDelay(
 					block.Parameters.Delay,
@@ -1588,7 +1588,7 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 				return fmt.Sprintf("%.3g s · exact", parameters.Delay)
 			case delayModeThiran:
 				if normalizedSampleTimeMode(parameters) == sampleTimeInherited {
-					return fmt.Sprintf("%.3g s · Thiran %d @ run step", parameters.Delay, parameters.Approximation)
+					return fmt.Sprintf("%.3g s · Thiran %d @ inherited rate", parameters.Delay, parameters.Approximation)
 				}
 				return fmt.Sprintf("%.3g s · Thiran %d @ %.3g s", parameters.Delay, parameters.Approximation, parameters.SampleTime)
 			default:
@@ -2202,7 +2202,7 @@ func sampleTimeFields() []parameterDefinition {
 			text: func(parameters Parameters) string {
 				return string(normalizedSampleTimeMode(parameters))
 			},
-			Help: "Uses connected model context when supported, then falls back to the run sample time.",
+			Help: "Uses connected single-rate model context, then falls back to the run sample time.",
 		},
 		conditionalNumberField(
 			"sample_time", "Sample time", "sample time",

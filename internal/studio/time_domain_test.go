@@ -202,6 +202,164 @@ func TestInheritedUnitDelayUsesConnectedExplicitDiscreteRate(t *testing.T) {
 	}
 }
 
+func TestInheritedDiscreteBlocksUseConnectedRateThroughNeutralBlocks(t *testing.T) {
+	kinds := []BlockKind{
+		BlockUnitDelay,
+		BlockDiscreteTransfer,
+		BlockDiscreteStateSpace,
+		BlockDiscretizedTransfer,
+		BlockDelay,
+	}
+	for _, kind := range kinds {
+		t.Run(string(kind), func(t *testing.T) {
+			anchor := defaultParameters(BlockDiscreteTransfer)
+			anchor.SampleTime = 0.2
+			anchor.SampleTimeMode = string(sampleTimeExplicit)
+			target := defaultParameters(kind)
+			target.SampleTimeMode = string(sampleTimeInherited)
+			if kind == BlockDelay {
+				target.DelayMode = delayModeThiran
+			}
+			blocks := []Block{
+				{ID: 5, Kind: BlockScope, Name: "Output"},
+				{ID: 4, Kind: kind, Name: "Inherited", Parameters: target},
+				{ID: 3, Kind: BlockGain, Name: "Neutral", Parameters: Parameters{Gain: 1}},
+				{ID: 2, Kind: BlockDiscreteTransfer, Name: "Anchor", Parameters: anchor},
+				{ID: 1, Kind: BlockSource, Name: "Input", Parameters: Parameters{Amplitude: 1}},
+			}
+			connections := []Connection{
+				{SourceID: 4, TargetID: 5},
+				{SourceID: 3, TargetID: 4},
+				{SourceID: 2, TargetID: 3},
+				{SourceID: 1, TargetID: 2},
+			}
+
+			model, err := compileModel(blocks, connections)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fidelity, err := model.fidelity(0.2)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var inheritedRate *BlockRate
+			for i := range fidelity.BlockRates {
+				if fidelity.BlockRates[i].BlockID == 4 {
+					inheritedRate = &fidelity.BlockRates[i]
+					break
+				}
+			}
+			if inheritedRate == nil ||
+				inheritedRate.Mode != string(sampleTimeInherited) ||
+				inheritedRate.SampleTime != 0.2 {
+				t.Fatalf("inherited fidelity rate = %#v", inheritedRate)
+			}
+			for _, block := range model.modelProvenance().Blocks {
+				if block.ID == 4 &&
+					block.Parameters.SampleTimeMode != string(sampleTimeInherited) {
+					t.Fatalf("inherited provenance = %#v", block.Parameters)
+				}
+			}
+		})
+	}
+}
+
+func TestInheritedSampleTimeRegionAcceptsEqualAnchors(t *testing.T) {
+	left := defaultParameters(BlockDiscreteTransfer)
+	left.SampleTime = 0.2
+	left.SampleTimeMode = string(sampleTimeExplicit)
+	right := defaultParameters(BlockDiscreteStateSpace)
+	right.SampleTime = 0.2
+	right.SampleTimeMode = string(sampleTimeExplicit)
+	blocks := []Block{
+		{ID: 5, Kind: BlockDiscreteStateSpace, Name: "Right anchor", Parameters: right},
+		{ID: 4, Kind: BlockGain, Name: "Right gain", Parameters: Parameters{Gain: 1}},
+		{ID: 3, Kind: BlockUnitDelay, Name: "Memory", Parameters: Parameters{
+			SampleTimeMode: string(sampleTimeInherited),
+		}},
+		{ID: 2, Kind: BlockGain, Name: "Left gain", Parameters: Parameters{Gain: 1}},
+		{ID: 1, Kind: BlockDiscreteTransfer, Name: "Left anchor", Parameters: left},
+	}
+	connections := []Connection{
+		{SourceID: 4, TargetID: 5},
+		{SourceID: 3, TargetID: 4},
+		{SourceID: 2, TargetID: 3},
+		{SourceID: 1, TargetID: 2},
+	}
+
+	_, rates, err := resolveModelSampleTimes(blocks, connections, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := rates[3]; got != 0.2 {
+		t.Fatalf("inherited sample time = %g, want 0.2", got)
+	}
+}
+
+func TestInheritedSampleTimeRegionDoesNotCrossContinuousBlocks(t *testing.T) {
+	anchor := defaultParameters(BlockDiscreteTransfer)
+	anchor.SampleTime = 0.2
+	anchor.SampleTimeMode = string(sampleTimeExplicit)
+	target := defaultParameters(BlockDiscreteStateSpace)
+	target.SampleTimeMode = string(sampleTimeInherited)
+	blocks := []Block{
+		{ID: 1, Kind: BlockDiscreteTransfer, Name: "Anchor", Parameters: anchor},
+		{ID: 2, Kind: BlockLag, Name: "Continuous", Parameters: Parameters{TimeConstant: 1}},
+		{ID: 3, Kind: BlockDiscreteStateSpace, Name: "Inherited plant", Parameters: target},
+	}
+	connections := []Connection{
+		{SourceID: 1, TargetID: 2},
+		{SourceID: 2, TargetID: 3},
+	}
+
+	_, _, err := resolveModelSampleTimes(blocks, connections, 0)
+	if err == nil ||
+		!strings.Contains(err.Error(), "Inherited plant: inherited sample time requires a positive run sample time") {
+		t.Fatalf("barrier error = %v, want missing base-step guidance", err)
+	}
+}
+
+func TestInheritedSampleTimeRegionRejectsConflictingAnchorsDeterministically(t *testing.T) {
+	fast := defaultParameters(BlockDiscreteTransfer)
+	fast.SampleTime = 0.1
+	fast.SampleTimeMode = string(sampleTimeExplicit)
+	slow := defaultParameters(BlockDiscreteStateSpace)
+	slow.SampleTime = 0.2
+	slow.SampleTimeMode = string(sampleTimeExplicit)
+	blocks := []Block{
+		{ID: 5, Kind: BlockDiscreteStateSpace, Name: "Slow plant", Parameters: slow},
+		{ID: 4, Kind: BlockGain, Name: "Downstream gain", Parameters: Parameters{Gain: 1}},
+		{ID: 3, Kind: BlockUnitDelay, Name: "Memory", Parameters: Parameters{
+			SampleTimeMode: string(sampleTimeInherited),
+		}},
+		{ID: 2, Kind: BlockGain, Name: "Upstream gain", Parameters: Parameters{Gain: 1}},
+		{ID: 1, Kind: BlockDiscreteTransfer, Name: "Fast filter", Parameters: fast},
+	}
+	connections := []Connection{
+		{SourceID: 4, TargetID: 5},
+		{SourceID: 3, TargetID: 4},
+		{SourceID: 2, TargetID: 3},
+		{SourceID: 1, TargetID: 2},
+	}
+
+	_, _, first := resolveModelSampleTimes(blocks, connections, 0)
+	if first == nil ||
+		!strings.Contains(first.Error(), "Memory") ||
+		!strings.Contains(first.Error(), "Fast filter") ||
+		!strings.Contains(first.Error(), "0.1 s") ||
+		!strings.Contains(first.Error(), "Slow plant") ||
+		!strings.Contains(first.Error(), "0.2 s") {
+		t.Fatalf("conflict error = %v", first)
+	}
+	for left, right := 0, len(connections)-1; left < right; left, right = left+1, right-1 {
+		connections[left], connections[right] = connections[right], connections[left]
+	}
+	_, _, second := resolveModelSampleTimes(blocks, connections, 0)
+	if second == nil || second.Error() != first.Error() {
+		t.Fatalf("reordered conflict error = %v, want %v", second, first)
+	}
+}
+
 func TestCompileReportsMixedDomainAndRateContracts(t *testing.T) {
 	t.Run("continuous and discrete", func(t *testing.T) {
 		_, err := compileModel([]Block{

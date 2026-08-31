@@ -75,12 +75,14 @@ semantics that do not change block topology:
   period.
 
 This subset does not add reset, saturation, external initial-condition ports,
-state ports, vector state, or solver configuration. Unit Delay also retains
-Process Lab's explicit 0.1 second new-block sample-time default until analysis
-requests can resolve an inherited rate from connected model context.
-Forward propagation currently starts at an explicit discrete block and passes
-through Unit Delay chains. Unresolved rates retain the run-step fallback;
-backward propagation and general multirate scheduling remain outside this subset.
+state ports, vector state, or solver configuration. Unit Delay retains Process
+Lab's explicit 0.1 second new-block sample-time default. When inherited mode is
+authored, compilation follows MathWorks' documented
+[forward and backward sample-time propagation](https://www.mathworks.com/help/simulink/ug/how-propagation-affects-inherited-sample-times.html):
+a unique explicit discrete rate propagates transitively through rate-neutral and
+inherited-discrete blocks. Unresolved regions retain the run-step fallback.
+Conflicting explicit anchors remain invalid because Process Lab does not yet
+provide general multirate scheduling or a Rate Transition block.
 
 Transfer Function remains a zero-initial-state block. This matches the
 MathWorks contract, which directs nonzero transfer-function initial conditions
@@ -101,10 +103,12 @@ to every state, or one finite value per row of `A`. Initial states are assembled
 by the compiler in the same realization order used for scalar stateful blocks.
 
 The Discrete State-Space block retains Process Lab's explicit 0.1 second
-new-block sample time. Simulink defaults this parameter to inherited (`-1`),
-which Process Lab cannot represent until model-level inherited-rate analysis is
-available. Named input, output, and state channels also remain a
-Process-Lab-specific extension.
+new-block sample time, while Simulink documents an
+[inherited (`-1`) default](https://www.mathworks.com/help/simulink/slref/discretestatespace.html).
+Process Lab authors can select inherited mode; compilation resolves it from the
+same connected single-rate model context used by the other inherited discrete
+blocks, then falls back to the run step when the region has no explicit anchor.
+Named input, output, and state channels remain a Process-Lab-specific extension.
 
 Exact scalar Transport Delay supports the documented finite Initial output
 value. The value supplies constant pre-simulation history until the aligned
@@ -156,9 +160,11 @@ spacers, and specified-dimension reduction remain outside this subset.
 
 Unit Delay accepts the same explicit scalar or vector width. Its scalar initial
 condition broadcasts across the vector unless a one-value or width-matched
-vector initial condition is authored. In inherited-rate mode, the compiler uses
-a connected upstream explicit discrete rate and propagates it through Unit Delay
-chains. If no such context exists, it uses the public run step as before. The
+vector initial condition is authored. In inherited-rate mode, Unit Delay uses
+the model-level resolver shared by Discrete Transfer Function, Discrete
+State-Space, Discretized Transfer, and Thiran Transport Delay. A connected
+explicit rate propagates in either direction through neutral and inherited
+blocks; if no such context exists, the public run step is used as before. The
 authored block remains inherited in saved-model and run provenance. Saved Sum
 and Unit Delay blocks without a width remain scalar, so opening an existing
 diagram does not change its ports or response.
