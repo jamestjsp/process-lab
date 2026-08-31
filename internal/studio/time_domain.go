@@ -46,6 +46,72 @@ type blockTimeDomain struct {
 	sampleTime sampleTimeSpec
 }
 
+func resolveModelSampleTimes(
+	blocks []Block,
+	connections []Connection,
+	baseStep float64,
+) ([]Block, map[int64]float64, error) {
+	blockByID := make(map[int64]Block, len(blocks))
+	resolved := make(map[int64]float64)
+	for _, block := range blocks {
+		blockByID[block.ID] = block
+		domain := blockDefinitions[block.Kind].domain(block.Parameters)
+		if domain.kind != timeDomainDiscrete || domain.sampleTime.mode != sampleTimeExplicit {
+			continue
+		}
+		sampleTime, err := domain.sampleTime.resolve(0)
+		if err != nil {
+			return nil, nil, invalid("%s: %s", block.Name, err)
+		}
+		resolved[block.ID] = sampleTime
+	}
+
+	for {
+		changed := false
+		for _, connection := range connections {
+			target := blockByID[connection.TargetID]
+			if target.Kind != BlockUnitDelay ||
+				normalizedSampleTimeMode(target.Parameters) != sampleTimeInherited {
+				continue
+			}
+			if _, ok := resolved[target.ID]; ok {
+				continue
+			}
+			sampleTime, ok := resolved[connection.SourceID]
+			if !ok {
+				continue
+			}
+			resolved[target.ID] = sampleTime
+			changed = true
+		}
+		if !changed {
+			break
+		}
+	}
+
+	compiled := make([]Block, len(blocks))
+	for i, block := range blocks {
+		domain := blockDefinitions[block.Kind].domain(block.Parameters)
+		if domain.kind != timeDomainDiscrete {
+			compiled[i] = block
+			continue
+		}
+		sampleTime, ok := resolved[block.ID]
+		if !ok {
+			var err error
+			sampleTime, err = domain.sampleTime.resolve(baseStep)
+			if err != nil {
+				return nil, nil, invalid("%s: %s", block.Name, err)
+			}
+			resolved[block.ID] = sampleTime
+		}
+		block.Parameters.SampleTime = sampleTime
+		block.Parameters.SampleTimeMode = string(sampleTimeExplicit)
+		compiled[i] = block
+	}
+	return compiled, resolved, nil
+}
+
 func neutralTimeDomain() blockTimeDomain {
 	return blockTimeDomain{kind: timeDomainNeutral}
 }

@@ -153,6 +153,7 @@ func compileRequestedModel(
 
 	blockByID := make(map[int64]Block, len(blocks))
 	originalBlockByID := make(map[int64]Block, len(blocks))
+	authoredBlocks := make([]Block, 0, len(blocks))
 	incoming := make(map[int64][]Connection, len(blocks))
 	var sources, sinks []Block
 	for _, block := range blocks {
@@ -164,21 +165,14 @@ func compileRequestedModel(
 		}
 		original := block
 		original.Parameters = cloneParameters(block.Parameters)
-		block, err := resolveBlockForCompilation(block, request.baseStep)
-		if err != nil {
-			return nil, invalid("%s: %s", original.Name, err)
-		}
-		if err := validateParameters(block.Kind, block.Parameters); err != nil {
-			return nil, invalid("%s: %s", block.Name, err)
-		}
-		block.Parameters = cloneParameters(block.Parameters)
-		blockByID[block.ID] = block
+		blockByID[original.ID] = original
 		originalBlockByID[block.ID] = original
+		authoredBlocks = append(authoredBlocks, original)
 		switch {
-		case block.Kind.isSource():
-			sources = append(sources, block)
-		case block.Kind.isSink():
-			sinks = append(sinks, block)
+		case original.Kind.isSource():
+			sources = append(sources, original)
+		case original.Kind.isSink():
+			sinks = append(sinks, original)
 		}
 	}
 	if len(sources) == 0 {
@@ -206,6 +200,20 @@ func compileRequestedModel(
 			return nil, err
 		}
 		incoming[target.ID] = append(incoming[target.ID], connection)
+	}
+
+	resolvedBlocks, sampleTimes, err := resolveModelSampleTimes(
+		authoredBlocks, connections, request.baseStep,
+	)
+	if err != nil {
+		return nil, err
+	}
+	for _, block := range resolvedBlocks {
+		if err := validateParameters(block.Kind, block.Parameters); err != nil {
+			return nil, invalid("%s: %s", block.Name, err)
+		}
+		block.Parameters = cloneParameters(block.Parameters)
+		blockByID[block.ID] = block
 	}
 
 	orderedBlocks := make([]Block, 0, len(blockByID))
@@ -493,22 +501,9 @@ func compileRequestedModel(
 			Blocks:      provenanceBlocks,
 			Connections: provenanceConnections,
 		},
-		execution: execution,
+		execution:   execution,
+		sampleTimes: sampleTimes,
 	}, nil
-}
-
-func resolveBlockForCompilation(block Block, baseStep float64) (Block, error) {
-	domain := blockDefinitions[block.Kind].domain(block.Parameters)
-	if domain.kind != timeDomainDiscrete {
-		return block, nil
-	}
-	sampleTime, err := domain.sampleTime.resolve(baseStep)
-	if err != nil {
-		return Block{}, err
-	}
-	block.Parameters.SampleTime = sampleTime
-	block.Parameters.SampleTimeMode = string(sampleTimeExplicit)
-	return block, nil
 }
 
 func applyCompiledTimeDomains(blocks []Block, systems []*controlsys.System, baseStep float64) error {
