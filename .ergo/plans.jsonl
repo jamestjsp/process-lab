@@ -1309,3 +1309,6 @@
 {"type":"message","ts":"2026-08-31T05:23:53.62887Z","data":{"task_id":"RPEVFU","kind":"done","text":"Published and verified as stacked PR #19 from codex/model-delay-sink-compatibility on codex/inherited-signal-widths; local and remote heads matched at publication.","ts":"2026-08-31T05:23:53.62887Z"}}
 {"type":"claim","ts":"2026-08-31T05:25:13.253168Z","data":{"id":"6NBONY","agent_id":"codex-final-audit@local","ts":"2026-08-31T05:25:13.253168Z"}}
 {"type":"state","ts":"2026-08-31T05:25:13.253168Z","data":{"id":"6NBONY","state":"doing","ts":"2026-08-31T05:25:13.253168Z"}}
+{"type":"message","ts":"2026-08-31T05:35:53.400222Z","data":{"task_id":"6NBONY","kind":"block","text":"Pre-merge audit and all final gates pass, but completion requires PRs #17, #18, and #19 to merge in order, followed by live origin/main verification. Draft PR #20 remains intentionally unready until that external merge condition changes.","ts":"2026-08-31T05:35:53.400222Z"}}
+{"type":"unclaim","ts":"2026-08-31T05:35:53.400222Z","data":{"id":"6NBONY","ts":"2026-08-31T05:35:53.400222Z"}}
+{"type":"state","ts":"2026-08-31T05:35:53.400222Z","data":{"id":"6NBONY","state":"blocked","ts":"2026-08-31T05:35:53.400222Z"}}
