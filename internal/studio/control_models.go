@@ -597,12 +597,17 @@ func buildControlModels(
 	controllerInputs := appendResolved(
 		spec.Controller.ReferenceInputs, spec.Controller.MeasurementInputs,
 	)
+	controllerBaseStep := request.BaseStep
+	if controllerBaseStep == 0 && plant.IsDiscrete() &&
+		subsystemUsesInheritedTimeDomain(snapshot.Blocks, spec.Controller.Blocks) {
+		controllerBaseStep = plant.Dt
+	}
 	referenceController, err := compileControlSubsystem(
 		snapshot,
 		spec.Controller.Blocks,
 		controllerInputs,
 		spec.Controller.ControlOutputs,
-		request.BaseStep,
+		controllerBaseStep,
 	)
 	if err != nil {
 		return ControlModelSet{}, fmt.Errorf("build controller: %w", err)
@@ -700,6 +705,24 @@ func negateSystemOutputs(system *controlsys.System) (*controlsys.System, error) 
 		return nil, err
 	}
 	return result, nil
+}
+
+func subsystemUsesInheritedTimeDomain(blocks []Block, blockIDs []int64) bool {
+	selected := make(map[int64]struct{}, len(blockIDs))
+	for _, blockID := range blockIDs {
+		selected[blockID] = struct{}{}
+	}
+	for _, block := range blocks {
+		if _, ok := selected[block.ID]; !ok {
+			continue
+		}
+		domain := blockDefinitions[block.Kind].domain(block.Parameters)
+		if domain.kind == timeDomainDiscrete &&
+			domain.sampleTime.mode == sampleTimeInherited {
+			return true
+		}
+	}
+	return false
 }
 
 func subsystemUsesOnlyNeutralTimeDomain(blocks []Block, blockIDs []int64) bool {

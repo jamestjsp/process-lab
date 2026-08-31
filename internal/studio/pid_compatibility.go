@@ -24,6 +24,14 @@ func pidFilterCoefficientField() parameterDefinition {
 	return field
 }
 
+func pidValidationSampleTime(parameters Parameters) float64 {
+	if normalizedModelDomain(parameters) == modelDomainDiscrete &&
+		normalizedSampleTimeMode(parameters) == sampleTimeInherited {
+		return 0
+	}
+	return representationSampleTime(parameters)
+}
+
 func pidFilterTime(parameters Parameters) float64 {
 	if parameters.FilterCoefficient > 0 {
 		return 1 / parameters.FilterCoefficient

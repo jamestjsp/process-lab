@@ -40,20 +40,7 @@ func representationTimeDomain(parameters Parameters) blockTimeDomain {
 
 func representationTimeFields() []parameterDefinition {
 	return []parameterDefinition{
-		{
-			Name: "time_domain", Label: "Time domain", Type: "select",
-			Options: []parameterOption{
-				{Value: modelDomainContinuous, Label: "Continuous"},
-				{Value: modelDomainDiscrete, Label: "Discrete"},
-			},
-			set: func(parameters *Parameters, raw string) error {
-				parameters.TimeDomain = strings.ToLower(strings.TrimSpace(raw))
-				return nil
-			},
-			text: func(parameters Parameters) string {
-				return normalizedModelDomain(parameters)
-			},
-		},
+		representationTimeDomainField(),
 		conditionalNumberField(
 			"sample_time", "Discrete sample time", "sample time",
 			"0.001", MinSimulationSampleTime, "sec",
@@ -62,6 +49,39 @@ func representationTimeFields() []parameterDefinition {
 				parameterActivation("time_domain", modelDomainDiscrete),
 			},
 		),
+	}
+}
+
+func inheritableRepresentationTimeFields() []parameterDefinition {
+	sampleTime := sampleTimeFields()
+	sampleTime[0].optional = true
+	return []parameterDefinition{
+		representationTimeDomainField(),
+		activateParameterField(
+			sampleTime[0],
+			parameterActivation("time_domain", modelDomainDiscrete),
+		),
+		activateParameterField(
+			sampleTime[1],
+			parameterActivation("time_domain", modelDomainDiscrete),
+		),
+	}
+}
+
+func representationTimeDomainField() parameterDefinition {
+	return parameterDefinition{
+		Name: "time_domain", Label: "Time domain", Type: "select",
+		Options: []parameterOption{
+			{Value: modelDomainContinuous, Label: "Continuous"},
+			{Value: modelDomainDiscrete, Label: "Discrete"},
+		},
+		set: func(parameters *Parameters, raw string) error {
+			parameters.TimeDomain = strings.ToLower(strings.TrimSpace(raw))
+			return nil
+		},
+		text: func(parameters Parameters) string {
+			return normalizedModelDomain(parameters)
+		},
 	}
 }
 
@@ -75,6 +95,17 @@ func validateRepresentationTime(parameters Parameters) error {
 			return invalid("discrete sample time must be a positive finite number")
 		}
 		return nil
+	default:
+		return invalid("time domain must be continuous or discrete")
+	}
+}
+
+func validateInheritableRepresentationTime(parameters Parameters) error {
+	switch normalizedModelDomain(parameters) {
+	case modelDomainContinuous:
+		return nil
+	case modelDomainDiscrete:
+		return validateDiscreteSampleTime(parameters)
 	default:
 		return invalid("time domain must be continuous or discrete")
 	}

@@ -338,8 +338,9 @@ compilation, a unique connected explicit rate propagates both forward and
 backward through rate-neutral and inherited-discrete blocks, matching the
 documented [model-context propagation process](https://www.mathworks.com/help/simulink/ug/how-propagation-affects-inherited-sample-times.html).
 The shared resolver covers Unit Delay, Discrete Transfer Function, Discrete
-State-Space, Discretized Transfer, and discrete Thiran delay. A region without
-an explicit anchor retains the run-step fallback; conflicting anchors are
+State-Space, Discretized Transfer, discrete Thiran delay, PID, and PID2. A
+region without an explicit anchor retains the run-step fallback; conflicting
+anchors are
 rejected because general multirate execution is not yet supported. Authored
 inherited modes remain intact in persistence and fidelity provenance. Unit
 Delay carries its state exactly between samples. Discrete Transfer Function
