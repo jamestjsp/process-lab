@@ -82,6 +82,7 @@ type compiledModel struct {
 	signals      []compiledSignal
 	provenance   compiledModelProvenance
 	execution    executionPartition
+	sampleTimes  map[int64]float64
 }
 
 func (m *compiledModel) initialStateVector() *mat.VecDense {
@@ -186,6 +187,7 @@ func (m *compiledModel) selectOutputs(probes []modelProbe) (*compiledModel, erro
 		signals:      m.signals,
 		provenance:   m.provenance,
 		execution:    m.execution,
+		sampleTimes:  m.sampleTimes,
 	}, nil
 }
 
@@ -620,13 +622,15 @@ func (m *compiledModel) fidelity(baseStep float64) (Fidelity, error) {
 	}
 	seenDelayModels := make(map[string]struct{})
 	for _, block := range m.provenance.Blocks {
+		var effectiveSampleTime float64
 		domain := blockDefinitions[block.Kind].domain(block.Parameters)
 		if domain.kind == timeDomainDiscrete {
-			sampleTime, err := domain.sampleTime.resolve(baseStep)
-			if err != nil {
-				return Fidelity{}, fmt.Errorf("%s sample time: %w", block.Name, err)
+			var ok bool
+			effectiveSampleTime, ok = m.sampleTimes[block.ID]
+			if !ok {
+				return Fidelity{}, fmt.Errorf("%s has no compiled sample time", block.Name)
 			}
-			schedule, err := scheduleSampleTime(sampleTime, baseStep)
+			schedule, err := scheduleSampleTime(effectiveSampleTime, baseStep)
 			if err != nil {
 				return Fidelity{}, fmt.Errorf("%s sample schedule: %w", block.Name, err)
 			}
@@ -634,7 +638,7 @@ func (m *compiledModel) fidelity(baseStep float64) (Fidelity, error) {
 				BlockID:     block.ID,
 				BlockName:   block.Name,
 				Mode:        string(domain.sampleTime.mode),
-				SampleTime:  sampleTime,
+				SampleTime:  effectiveSampleTime,
 				UpdateEvery: schedule.updateEvery,
 			})
 		}
@@ -657,12 +661,7 @@ func (m *compiledModel) fidelity(baseStep float64) (Fidelity, error) {
 		case delayModeThiran:
 			delay.ApproximationOrder = block.Parameters.Approximation
 			delay.SampleTimeMode = string(normalizedSampleTimeMode(block.Parameters))
-			sampleTime, resolveErr := blockDefinitions[block.Kind].
-				domain(block.Parameters).sampleTime.resolve(baseStep)
-			if resolveErr != nil {
-				return Fidelity{}, fmt.Errorf("%s Thiran sample time: %w", block.Name, resolveErr)
-			}
-			delay.SampleTime = sampleTime
+			delay.SampleTime = effectiveSampleTime
 		}
 		fidelity.Delays = append(fidelity.Delays, delay)
 		if _, exists := seenDelayModels[mode]; exists {

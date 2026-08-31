@@ -77,7 +77,10 @@ semantics that do not change block topology:
 This subset does not add reset, saturation, external initial-condition ports,
 state ports, vector state, or solver configuration. Unit Delay also retains
 Process Lab's explicit 0.1 second new-block sample-time default until analysis
-requests can resolve an inherited rate from an explicit model-level base step.
+requests can resolve an inherited rate from connected model context.
+Forward propagation currently starts at an explicit discrete block and passes
+through Unit Delay chains. Unresolved rates retain the run-step fallback;
+backward propagation and general multirate scheduling remain outside this subset.
 
 Transfer Function remains a zero-initial-state block. This matches the
 MathWorks contract, which directs nonzero transfer-function initial conditions
@@ -153,10 +156,12 @@ spacers, and specified-dimension reduction remain outside this subset.
 
 Unit Delay accepts the same explicit scalar or vector width. Its scalar initial
 condition broadcasts across the vector unless a one-value or width-matched
-vector initial condition is authored. The existing inherited-rate mode uses the
-public run step and is unchanged. Saved Sum and Unit Delay blocks without a
-width remain scalar, so opening an existing diagram does not change its ports
-or response.
+vector initial condition is authored. In inherited-rate mode, the compiler uses
+a connected upstream explicit discrete rate and propagates it through Unit Delay
+chains. If no such context exists, it uses the public run step as before. The
+authored block remains inherited in saved-model and run provenance. Saved Sum
+and Unit Delay blocks without a width remain scalar, so opening an existing
+diagram does not change its ports or response.
 
 Vector Sum, Vector Constant, Matrix Gain, Mux, Demux, Selector, Permutation, and
 Vector Scope remain intentional Process-Lab-specific named-channel

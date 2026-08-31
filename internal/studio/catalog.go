@@ -1821,7 +1821,7 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 		summary: func(parameters Parameters) string {
 			width := normalizedDirectSignalWidth(parameters)
 			if normalizedSampleTimeMode(parameters) == sampleTimeInherited {
-				return fmt.Sprintf("%d-channel z⁻¹ @ run step", width)
+				return fmt.Sprintf("%d-channel z⁻¹ @ inherited rate", width)
 			}
 			return fmt.Sprintf("%d-channel z⁻¹ @ %.3g s", width, parameters.SampleTime)
 		},
@@ -2193,7 +2193,7 @@ func sampleTimeFields() []parameterDefinition {
 			Name: "sample_time_mode", Label: "Sample time source", Type: "select",
 			Options: []parameterOption{
 				{Value: string(sampleTimeExplicit), Label: "Explicit"},
-				{Value: string(sampleTimeInherited), Label: "Inherit run sample time"},
+				{Value: string(sampleTimeInherited), Label: "Inherited"},
 			},
 			set: func(parameters *Parameters, raw string) error {
 				parameters.SampleTimeMode = strings.ToLower(strings.TrimSpace(raw))
@@ -2202,6 +2202,7 @@ func sampleTimeFields() []parameterDefinition {
 			text: func(parameters Parameters) string {
 				return string(normalizedSampleTimeMode(parameters))
 			},
+			Help: "Uses connected model context when supported, then falls back to the run sample time.",
 		},
 		conditionalNumberField(
 			"sample_time", "Sample time", "sample time",

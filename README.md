@@ -333,8 +333,11 @@ continuous rational model, while Thiran is a discrete all-pass model with its
 own sample time. Stored delays created before these choices existed retain
 their historical Padé behavior.
 
-Discrete blocks declare an explicit sample time or inherit the run step. Unit
-Delay carries its state exactly between samples. Discrete Transfer Function
+Discrete blocks declare an explicit or inherited sample time. An inherited
+Unit Delay first resolves from a connected upstream discrete rate, including
+through a chain of inherited Unit Delays. When no upstream discrete rate is
+available, it retains the existing run-step fallback. Unit Delay carries its
+state exactly between samples. Discrete Transfer Function
 and State-Space blocks are realized directly at their declared `Dt`.
 Discretized Transfer makes conversion a visible model choice—ZOH, FOH,
 matched pole-zero, or impulse invariant—rather than silently choosing a

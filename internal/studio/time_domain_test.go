@@ -3,6 +3,7 @@ package studio
 import (
 	"context"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -150,6 +151,54 @@ func TestInheritedThiranUsesRunSampleTimeWithoutChangingProvenance(t *testing.T)
 	if _, err := compileModel(blocks, connections); err == nil ||
 		!strings.Contains(err.Error(), "inherited sample time requires a positive run sample time") {
 		t.Fatalf("analysis compile error = %v, want missing base-step guidance", err)
+	}
+}
+
+func TestInheritedUnitDelayUsesConnectedExplicitDiscreteRate(t *testing.T) {
+	filter := defaultParameters(BlockDiscreteTransfer)
+	filter.SampleTime = 0.2
+	filter.SampleTimeMode = string(sampleTimeExplicit)
+	blocks := []Block{
+		{ID: 1, Kind: BlockSource, Name: "Input", Parameters: Parameters{Amplitude: 1}},
+		{ID: 2, Kind: BlockDiscreteTransfer, Name: "Filter", Parameters: filter},
+		{ID: 3, Kind: BlockUnitDelay, Name: "Memory A", Parameters: Parameters{
+			SampleTimeMode: string(sampleTimeInherited),
+		}},
+		{ID: 4, Kind: BlockUnitDelay, Name: "Memory B", Parameters: Parameters{
+			SampleTimeMode: string(sampleTimeInherited),
+		}},
+		{ID: 5, Kind: BlockScope, Name: "Output"},
+	}
+	connections := []Connection{
+		{ID: 4, SourceID: 4, TargetID: 5},
+		{ID: 3, SourceID: 3, TargetID: 4},
+		{ID: 2, SourceID: 2, TargetID: 3},
+		{ID: 1, SourceID: 1, TargetID: 2},
+	}
+
+	model, err := compileModel(blocks, connections)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if domain := model.timeDomain(); domain.Domain != timeDomainDiscrete || domain.SampleTime != 0.2 {
+		t.Fatalf("compiled domain = %#v, want discrete 0.2", domain)
+	}
+	fidelity, err := model.fidelity(0.2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantRates := []BlockRate{
+		{BlockID: 2, BlockName: "Filter", Mode: string(sampleTimeExplicit), SampleTime: 0.2, UpdateEvery: 1},
+		{BlockID: 3, BlockName: "Memory A", Mode: string(sampleTimeInherited), SampleTime: 0.2, UpdateEvery: 1},
+		{BlockID: 4, BlockName: "Memory B", Mode: string(sampleTimeInherited), SampleTime: 0.2, UpdateEvery: 1},
+	}
+	if !reflect.DeepEqual(fidelity.BlockRates, wantRates) {
+		t.Fatalf("block rates = %#v, want %#v", fidelity.BlockRates, wantRates)
+	}
+	for _, block := range model.modelProvenance().Blocks[2:4] {
+		if got := block.Parameters.SampleTimeMode; got != string(sampleTimeInherited) {
+			t.Fatalf("%s provenance sample time mode = %q, want inherited", block.Name, got)
+		}
 	}
 }
 
