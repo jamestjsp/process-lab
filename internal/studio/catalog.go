@@ -1326,13 +1326,14 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 		Defaults: Parameters{
 			Proportional: 1, Integral: 1, FilterCoefficient: 100,
 			TimeDomain: modelDomainContinuous, SampleTime: 0.1,
+			SampleTimeMode: string(sampleTimeExplicit),
 		},
 		Parameters: append([]parameterDefinition{
 			numberField("proportional", "Proportional P", "proportional gain", "any", -10000, 10000, "scalar", func(p *Parameters) *float64 { return &p.Proportional }),
 			numberField("integral", "Integral I", "integral gain", "any", -10000, 10000, "1/sec", func(p *Parameters) *float64 { return &p.Integral }),
 			numberField("derivative", "Derivative D", "derivative gain", "any", -10000, 10000, "sec", func(p *Parameters) *float64 { return &p.Derivative }),
 			pidFilterCoefficientField(),
-		}, representationTimeFields()...),
+		}, inheritableRepresentationTimeFields()...),
 		realize: func(block Block, _ []int) (*controlsys.System, error) {
 			return controlsys.NewPID(
 				block.Parameters.Proportional,
@@ -1344,7 +1345,7 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 		},
 		timeDomain: representationTimeDomain,
 		validate: func(parameters Parameters) error {
-			if err := validateRepresentationTime(parameters); err != nil {
+			if err := validateInheritableRepresentationTime(parameters); err != nil {
 				return err
 			}
 			_, err := controlsys.NewPID(
@@ -1352,7 +1353,7 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 				parameters.Integral,
 				parameters.Derivative,
 				controlsys.WithFilter(pidFilterTime(parameters)),
-				controlsys.WithTs(representationSampleTime(parameters)),
+				controlsys.WithTs(pidValidationSampleTime(parameters)),
 			).System()
 			if err != nil {
 				return invalid("PID realization: %s", err)
@@ -1374,6 +1375,7 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 			Proportional: 1, Integral: 1, FilterCoefficient: 100,
 			SetpointWeight: 1, DerivativeWeight: 1,
 			TimeDomain: modelDomainContinuous, SampleTime: 0.1,
+			SampleTimeMode: string(sampleTimeExplicit),
 		},
 		Parameters: append([]parameterDefinition{
 			numberField("proportional", "Proportional P", "proportional gain", "any", -10000, 10000, "scalar", func(p *Parameters) *float64 { return &p.Proportional }),
@@ -1382,7 +1384,7 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 			pidFilterCoefficientField(),
 			numberField("setpoint_weight", "Setpoint weight b", "setpoint weight", "any", -10, 10, "scalar", func(p *Parameters) *float64 { return &p.SetpointWeight }),
 			numberField("derivative_weight", "Derivative weight c", "derivative weight", "any", -10, 10, "scalar", func(p *Parameters) *float64 { return &p.DerivativeWeight }),
-		}, representationTimeFields()...),
+		}, inheritableRepresentationTimeFields()...),
 		variadic:   true,
 		inputPorts: func(Parameters) int { return 2 },
 		portSchema: func(Parameters) blockPortSchema {
@@ -1407,7 +1409,7 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 		},
 		timeDomain: representationTimeDomain,
 		validate: func(parameters Parameters) error {
-			if err := validateRepresentationTime(parameters); err != nil {
+			if err := validateInheritableRepresentationTime(parameters); err != nil {
 				return err
 			}
 			_, err := controlsys.NewPID2(
@@ -1417,7 +1419,7 @@ var blockDefinitions = map[BlockKind]blockDefinition{
 				pidFilterTime(parameters),
 				parameters.SetpointWeight,
 				parameters.DerivativeWeight,
-				controlsys.WithTs(representationSampleTime(parameters)),
+				controlsys.WithTs(pidValidationSampleTime(parameters)),
 			).System()
 			if err != nil {
 				return invalid("PID2 realization: %s", err)
@@ -2126,13 +2128,24 @@ func conditionalNumberField(
 	definition := minimumNumberField(
 		name, label, boundsLabel, step, minimum, unit, field,
 	)
-	definition.activation = cloneParameterActivations(activation)
-	if len(definition.activation) > 0 {
-		definition.active = func(parameters Parameters, definitions []parameterDefinition) bool {
-			return parameterActivationsMatch(parameters, definition.activation, definitions)
-		}
+	return activateParameterField(definition, activation...)
+}
+
+func activateParameterField(
+	field parameterDefinition,
+	activation ...ParameterActivation,
+) parameterDefinition {
+	combined := cloneParameterActivations(activation)
+	combined = append(combined, cloneParameterActivations(field.activation)...)
+	field.activation = combined
+	if len(field.activation) == 0 {
+		field.active = nil
+		return field
 	}
-	return definition
+	field.active = func(parameters Parameters, definitions []parameterDefinition) bool {
+		return parameterActivationsMatch(parameters, field.activation, definitions)
+	}
+	return field
 }
 
 func parameterActivation(name string, values ...string) ParameterActivation {

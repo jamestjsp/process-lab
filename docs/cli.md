@@ -356,8 +356,8 @@ Flags:
 | `lag` | First-order Lag | Continuous | 1 / (τs + 1) | time_constant |
 | `integrator` | Integrator | Continuous | Continuous 1 / s | initial_condition |
 | `transfer` | Transfer Function | Continuous | Proper SISO model | numerator, denominator |
-| `pid` | PID Controller | Control | Parallel-form PID with filtered derivative | proportional, integral, derivative, filter_coefficient, time_domain, sample_time |
-| `pid2` | 2-DOF PID Controller | Control | Parallel-form 2-DOF PID with filtered derivative | proportional, integral, derivative, filter_coefficient, setpoint_weight, derivative_weight, time_domain, sample_time |
+| `pid` | PID Controller | Control | Parallel-form PID with filtered derivative | proportional, integral, derivative, filter_coefficient, time_domain, sample_time_mode, sample_time |
+| `pid2` | 2-DOF PID Controller | Control | Parallel-form 2-DOF PID with filtered derivative | proportional, integral, derivative, filter_coefficient, setpoint_weight, derivative_weight, time_domain, sample_time_mode, sample_time |
 | `delay` | Transport Delay | Continuous | Exact delay with explicit Padé and Thiran approximations | delay, initial_output, delay_mode, approximation, sample_time_mode, sample_time |
 | `state_space` | State-Space | Models | Named continuous or discrete MIMO model | a, b, c, d, initial_state, input_names, output_names, state_names, time_domain, sample_time |
 | `mimo_transfer` | MIMO Transfer Function | Models | Named transfer matrix with row denominators and pairwise delays | transfer_numerators, transfer_denominators, transfer_delays, input_names, output_names, time_domain, sample_time |

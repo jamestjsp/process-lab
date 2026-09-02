@@ -46,9 +46,12 @@ response is equivalent to the ordinary one-degree-of-freedom PID loop.
 
 ## Time domain and delay policy
 
-PID and PID2 blocks explicitly author continuous or discrete time. Discrete
-`Pidtune` candidates preserve the plant sample time, and apply writes the gains
-without changing the controller's time-domain settings.
+PID and PID2 blocks explicitly author continuous or discrete time. A discrete
+controller can use an explicit sample time or inherit its connected single-rate
+model context. When an inherited controller role is tuned without an explicit
+`BaseStep`, Process Lab uses the already compiled discrete plant rate. `Pidtune`
+candidates preserve that effective rate, while apply writes only the gains and
+leaves the authored mode and inactive fallback sample time unchanged.
 
 For delayed plants, tuning and frequency evidence use the exact delay carried
 by `controlsys`. The workflow does not silently introduce Padé or Thiran

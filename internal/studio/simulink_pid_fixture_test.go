@@ -77,8 +77,8 @@ func TestR2026aPIDFixtureCarriesTraceableProvenance(t *testing.T) {
 		t.Fatalf("fixture identity = version %d id %q release %q",
 			fixture.SchemaVersion, fixture.ID, fixture.Release)
 	}
-	if len(fixture.Mappings) != 2 || len(fixture.Cases) != 4 {
-		t.Fatalf("fixture mappings/cases = %d/%d, want 2/4",
+	if len(fixture.Mappings) != 2 || len(fixture.Cases) != 5 {
+		t.Fatalf("fixture mappings/cases = %d/%d, want 2/5",
 			len(fixture.Mappings), len(fixture.Cases))
 	}
 	for _, mapping := range fixture.Mappings {

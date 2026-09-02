@@ -6,17 +6,17 @@
     {
       "processLabBlock": "pid",
       "mathWorksBlock": "PID Controller and Discrete PID Controller",
-      "supportedSubset": "Parallel form with P, I, D, filtered derivative coefficient N, continuous time, and explicit-sample-time discrete Forward Euler integration and filtering. P, I, PI, PD, and PID behavior is selected by zeroing inactive gains.",
+      "supportedSubset": "Parallel form with P, I, D, filtered derivative coefficient N, continuous time, and explicit or inherited-sample-time discrete Forward Euler integration and filtering. P, I, PI, PD, and PID behavior is selected by zeroing inactive gains.",
       "intentionalDeviations": [
         "Process Lab exposes one parallel-form block instead of separate controller type and form menus.",
-        "Discrete sample time defaults to an explicit 0.1 second value instead of inherited -1 because model-level inherited-rate analysis is not available.",
+        "Process Lab retains an explicit 0.1 second default for new discrete controllers; inherited rate is opt-in.",
         "Ideal form, unfiltered derivative, saturation, anti-windup, reset, tracking, and external coefficient ports are outside this subset."
       ]
     },
     {
       "processLabBlock": "pid2",
       "mathWorksBlock": "PID Controller (2DOF) and Discrete PID Controller (2DOF)",
-      "supportedSubset": "Parallel 2DOF PID with proportional setpoint weight b, derivative setpoint weight c, filtered derivative coefficient N, and explicit reference and measurement inputs.",
+      "supportedSubset": "Parallel 2DOF PID with proportional setpoint weight b, derivative setpoint weight c, filtered derivative coefficient N, explicit or inherited discrete sample time, and explicit reference and measurement inputs.",
       "intentionalDeviations": [
         "Process Lab exposes one parallel-form block and selects PI, PD, or PID behavior by zeroing inactive gains.",
         "Ideal form, unfiltered derivative, saturation, anti-windup, reset, tracking, and external coefficient ports are outside this subset."
@@ -61,6 +61,19 @@
       "oracle": {
         "kind": "mathworks-formula-analytic",
         "description": "Expected frequency values substitute the documented Forward Euler operators; they are not MATLAB or Simulink output."
+      }
+    },
+    {
+      "id": "pid-inherited-discrete-rate",
+      "reference": {
+        "title": "PID Controller",
+        "url": "https://www.mathworks.com/help/simulink/slref/pidcontroller.html",
+        "section": "Sample time (-1 for inherited) and Forward Euler methods",
+        "accessed": "2026-08-30"
+      },
+      "oracle": {
+        "kind": "mathworks-formula-analytic",
+        "description": "Expected PID and PID2 frequency samples use the documented inherited-rate resolution and Forward Euler equations; they are not MATLAB or Simulink output."
       }
     },
     {

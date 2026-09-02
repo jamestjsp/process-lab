@@ -132,20 +132,22 @@ the equivalent coefficient when loaded.
 
 The supported continuous controller is
 `P + I/s + D*N*s/(s+N)`. The discrete controller uses the documented Forward
-Euler integration and filter methods at Process Lab's explicit sample time.
-PID2 adds the documented proportional and derivative setpoint weights:
+Euler integration and filter methods at its explicit or model-resolved
+inherited sample time. PID2 adds the documented proportional and derivative
+setpoint weights:
 `P*(b*r-y) + I/s*(r-y) + D*N*s/(s+N)*(c*r-y)`.
 
 New blocks use the documented direct defaults `P=1`, `I=1`, `D=0`, and
 `N=100`; PID2 also uses `b=c=1`. Process Lab's single parallel-form editor
 represents P, I, PI, PD, and PID controller types by setting unused gains to
 zero instead of adding a separate type menu. It does not yet expose Ideal form,
-unfiltered derivatives, inherited discrete sample time, saturation,
-anti-windup, reset, tracking, or external parameter ports.
+unfiltered derivatives, saturation, anti-windup, reset, tracking, or external
+parameter ports.
 
 The executable PID fixture checks direct defaults, continuous public time and
-frequency responses, discrete Forward Euler frequency response, and both PID2
-input paths against equations in the official R2026a block documentation.
+frequency responses, discrete Forward Euler frequency response, inherited-rate
+resolution and provenance, and both PID2 input paths against equations in the
+official R2026a block documentation.
 These analytic values are not MATLAB or Simulink output.
 
 ## Sum, direct vectors, and named routing
