@@ -282,7 +282,7 @@ representative fixtures—is in
 | Math | Sum | Adds, subtracts, or reduces scalar and explicitly sized vector inputs | One input port per sign |
 | Math | Vector Sum | Adds or subtracts named vectors | One vector input port per sign |
 | Continuous | First-order Lag | `1 / (τs + 1)` | Exactly one |
-| Continuous | Integrator | `1 / s` with zero initial condition | Exactly one |
+| Continuous | Integrator | `1 / s` with a configurable finite scalar initial condition | Exactly one |
 | Continuous | Transfer Function | Proper continuous SISO numerator/denominator model | Exactly one |
 | Continuous | PID Controller | Parallel PID with Simulink-style derivative filter coefficient N | Exactly one |
 | Continuous | Transport Delay | Exact delay metadata by default, or explicit Padé/Thiran approximation | Exactly one |
