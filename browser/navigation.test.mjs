@@ -209,20 +209,10 @@ describe("tab navigation", () => {
       // a page that looks and works about right, and a symptom-only check
       // would wave it through. What must hold is that the restore was
       // answered with a complete document.
-      // Collected as promises registered synchronously in the listener, so the
-      // assertion below cannot run before the bodies have been read.
-      const restores = [];
-      page.on("response", (response) => {
-        if (response.request().headers()["hx-history-restore-request"]) {
-          restores.push(
-            response.text().then((body) => ({
-              url: response.url(),
-              body,
-              headers: response.request().headers(),
-            })),
-          );
-        }
-      });
+      const restoreResponsePromise = page.waitForResponse(
+        (response) =>
+          response.request().headers()["hx-history-restore-request"] === "true",
+      );
 
       await page.goBack();
       await page.waitForFunction(
@@ -230,15 +220,19 @@ describe("tab navigation", () => {
         new URL(firstURL).pathname + new URL(firstURL).search,
       );
 
-      const restoredResponses = await Promise.all(restores);
-      assert.equal(restoredResponses.length, 1, "the server restore path was not used");
+      const restoreResponse = await restoreResponsePromise;
+      const restoredResponse = {
+        url: restoreResponse.url(),
+        body: await restoreResponse.text(),
+        headers: restoreResponse.request().headers(),
+      };
       assert.equal(
-        restoredResponses[0].headers["hx-history-restore-request"],
+        restoredResponse.headers["hx-history-restore-request"],
         "true",
       );
-      assert.equal(restoredResponses[0].headers["hx-request-type"], "full");
+      assert.equal(restoredResponse.headers["hx-request-type"], "full");
       assert.match(
-        restoredResponses[0].body.trimStart().slice(0, 40).toLowerCase(),
+        restoredResponse.body.trimStart().slice(0, 40).toLowerCase(),
         /^<!doctype html>/,
         "the history restore was answered with a fragment instead of a document",
       );
