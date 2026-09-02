@@ -269,6 +269,19 @@ func checkWiredPortCompatibility(ctx context.Context, tx *sql.Tx, changed Block)
 	return err
 }
 
+func validateStoredSignalWidths(
+	ctx context.Context,
+	queryer modelQueryer,
+	flowID int64,
+) error {
+	blocks, connections, err := loadModelGraph(ctx, queryer, flowID)
+	if err != nil {
+		return err
+	}
+	_, err = resolveModelSignalWidths(blocks, connections)
+	return err
+}
+
 func (s *Studio) DeleteBlock(ctx context.Context, blockID int64) (Snapshot, error) {
 	var flowID int64
 	err := s.inTx(ctx, func(tx *sql.Tx) error {
@@ -284,6 +297,9 @@ func (s *Studio) DeleteBlock(ctx context.Context, blockID int64) (Snapshot, erro
 		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM blocks WHERE id = ?", blockID); err != nil {
 			return fmt.Errorf("delete block: %w", err)
+		}
+		if err := validateStoredSignalWidths(ctx, tx, flowID); err != nil {
+			return err
 		}
 		return s.touchModel(ctx, tx, flowID, fmt.Sprintf("Deleted %s", block.Name))
 	})
@@ -326,6 +342,9 @@ func (s *Studio) DeleteBlocks(ctx context.Context, flowID int64, blockIDs []int6
 			); err != nil {
 				return fmt.Errorf("delete blocks: %w", err)
 			}
+		}
+		if err := validateStoredSignalWidths(ctx, tx, flowID); err != nil {
+			return err
 		}
 		message := "Deleted " + names[0]
 		if len(names) > 1 {
@@ -554,6 +573,9 @@ func (s *Studio) DisconnectBlock(ctx context.Context, blockID int64) (Snapshot, 
 		if removed == 0 {
 			return nil
 		}
+		if err := validateStoredSignalWidths(ctx, tx, flowID); err != nil {
+			return err
+		}
 		return s.touchModel(ctx, tx, flowID, fmt.Sprintf("Disconnected %s", block.Name))
 	})
 	if err != nil {
@@ -581,6 +603,9 @@ func (s *Studio) Disconnect(ctx context.Context, connectionID int64) (Snapshot, 
 		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM connections WHERE id = ?", connectionID); err != nil {
 			return fmt.Errorf("disconnect blocks: %w", err)
+		}
+		if err := validateStoredSignalWidths(ctx, tx, flowID); err != nil {
+			return err
 		}
 		return s.touchModel(ctx, tx, flowID, fmt.Sprintf("Disconnected %s → %s", sourceName, targetName))
 	})
