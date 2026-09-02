@@ -3,6 +3,7 @@ package studio
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
 	"os"
 	"strconv"
@@ -478,6 +479,132 @@ func TestR2026aShapePreservingBlocksInheritVectorWidthThroughPublicStudio(t *tes
 					channel, sample, got, want)
 			}
 		}
+	}
+}
+
+func TestInheritedWidthMutationsRejectInvalidFalloutAtomically(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Studio, context.Context, int64, int64, int64) error
+	}{
+		{
+			name: "disconnect wire",
+			mutate: func(service *Studio, ctx context.Context, _, _, connectionID int64) error {
+				_, err := service.Disconnect(ctx, connectionID)
+				return err
+			},
+		},
+		{
+			name: "disconnect block",
+			mutate: func(service *Studio, ctx context.Context, _, sourceID, _ int64) error {
+				_, err := service.DisconnectBlock(ctx, sourceID)
+				return err
+			},
+		},
+		{
+			name: "delete block",
+			mutate: func(service *Studio, ctx context.Context, _, sourceID, _ int64) error {
+				_, err := service.DeleteBlock(ctx, sourceID)
+				return err
+			},
+		},
+		{
+			name: "delete selection",
+			mutate: func(service *Studio, ctx context.Context, flowID, sourceID, _ int64) error {
+				_, err := service.DeleteBlocks(ctx, flowID, []int64{sourceID})
+				return err
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			service, ctx, flowID := newCompatibilityFlow(t, "inherited-width-"+test.name)
+			sourceID := addVectorConstant(
+				t, service, ctx, flowID, []float64{1, 2, 3}, 100, 100,
+			)
+
+			snapshot, gainID, err := service.AddBlock(
+				ctx, flowID, BlockGain, Point{X: 350, Y: 100},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gain := findBlock(t, snapshot.Blocks, gainID)
+			gainValues := make(map[string]string)
+			for _, field := range gain.EditorFields() {
+				gainValues[field.Name] = field.Value
+			}
+			if _, err := service.UpdateBlock(ctx, gainID, BlockUpdate{
+				Name: "Inherited gain", Parameters: gainValues,
+			}); err != nil {
+				t.Fatal(err)
+			}
+
+			_, scopeID, err := service.AddBlock(
+				ctx, flowID, BlockVectorScope, Point{X: 600, Y: 100},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := service.UpdateBlock(ctx, scopeID, BlockUpdate{
+				Name: "Vector output",
+				Parameters: map[string]string{
+					"input_names": channelNamesForWidth(t, 3).Text(),
+				},
+			}); err != nil {
+				t.Fatal(err)
+			}
+
+			before, err := service.Connect(ctx, flowID, Wire{
+				SourceID: sourceID, TargetID: gainID,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			before, err = service.Connect(ctx, flowID, Wire{
+				SourceID: gainID, TargetID: scopeID,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var sourceConnectionID int64
+			for _, connection := range before.Connections {
+				if connection.SourceID == sourceID && connection.TargetID == gainID {
+					sourceConnectionID = connection.ID
+					break
+				}
+			}
+			if sourceConnectionID == 0 {
+				t.Fatal("source connection was not persisted")
+			}
+
+			err = test.mutate(service, ctx, flowID, sourceID, sourceConnectionID)
+			var validation *ValidationError
+			if !errors.As(err, &validation) ||
+				!strings.Contains(err.Error(), "cannot connect Inherited gain") {
+				t.Fatalf("mutation error = %v, want inherited-width validation", err)
+			}
+
+			after, err := service.Snapshot(ctx, flowID)
+			if err != nil {
+				t.Fatalf("snapshot after rejected mutation: %v", err)
+			}
+			findBlock(t, after.Blocks, sourceID)
+			if len(after.Blocks) != len(before.Blocks) ||
+				len(after.Connections) != len(before.Connections) ||
+				len(after.Events) != len(before.Events) ||
+				len(after.Events) == 0 || after.Events[0].ID != before.Events[0].ID ||
+				!after.Flow.ModelUpdatedAt.Equal(before.Flow.ModelUpdatedAt) {
+				t.Fatalf("rejected mutation changed the flow:\nbefore=%#v\nafter=%#v", before, after)
+			}
+			for _, connection := range after.Connections {
+				if connection.ID == sourceConnectionID {
+					return
+				}
+			}
+			t.Fatal("rejected mutation removed the source connection")
+		})
 	}
 }
 
