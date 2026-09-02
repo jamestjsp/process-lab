@@ -71,8 +71,8 @@ func TestR2026aVectorRoutingFixtureCarriesTraceableProvenance(t *testing.T) {
 		t.Fatalf("fixture identity = version %d id %q release %q",
 			fixture.SchemaVersion, fixture.ID, fixture.Release)
 	}
-	if len(fixture.Mappings) != 10 || len(fixture.Cases) != 3 {
-		t.Fatalf("fixture mappings/cases = %d/%d, want 10/3",
+	if len(fixture.Mappings) != 11 || len(fixture.Cases) != 4 {
+		t.Fatalf("fixture mappings/cases = %d/%d, want 11/4",
 			len(fixture.Mappings), len(fixture.Cases))
 	}
 	compatibilityKinds := map[string]bool{
@@ -379,6 +379,169 @@ func TestR2026aVectorUnitDelayRunsAtInheritedRateThroughPublicStudio(t *testing.
 	}
 }
 
+func TestR2026aShapePreservingBlocksInheritVectorWidthThroughPublicStudio(t *testing.T) {
+	fixture := loadR2026aVectorRoutingFixture(t)
+	studio, ctx, flowID := newCompatibilityFlow(t, fixture.ID+"-inherited-width")
+	sourceID := addVectorConstant(
+		t, studio, ctx, flowID, fixture.UnitDelay.Input, 100, 100,
+	)
+
+	snapshot, gainID, err := studio.AddBlock(
+		ctx, flowID, BlockGain, Point{X: 350, Y: 100},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gain := findBlock(t, snapshot.Blocks, gainID)
+	gainValues := make(map[string]string)
+	for _, field := range gain.EditorFields() {
+		gainValues[field.Name] = field.Value
+	}
+	gainValues["gain"] = "2"
+	if _, err := studio.UpdateBlock(ctx, gainID, BlockUpdate{
+		Name: "Inherited vector gain", Parameters: gainValues,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot, delayID, err := studio.AddBlock(
+		ctx, flowID, BlockUnitDelay, Point{X: 600, Y: 100},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delay := findBlock(t, snapshot.Blocks, delayID)
+	delayValues := make(map[string]string)
+	for _, field := range delay.EditorFields() {
+		delayValues[field.Name] = field.Value
+	}
+	delayValues["initial_condition"] = "9"
+	if _, err := studio.UpdateBlock(ctx, delayID, BlockUpdate{
+		Name: "Inherited vector memory", Parameters: delayValues,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, scopeID, err := studio.AddBlock(
+		ctx, flowID, BlockVectorScope, Point{X: 850, Y: 100},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	width := len(fixture.UnitDelay.Input)
+	if _, err := studio.UpdateBlock(ctx, scopeID, BlockUpdate{
+		Name: "Inherited vector output",
+		Parameters: map[string]string{
+			"input_names": channelNamesForWidth(t, width).Text(),
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, wire := range []Wire{
+		{SourceID: sourceID, TargetID: gainID},
+		{SourceID: gainID, TargetID: delayID},
+		{SourceID: delayID, TargetID: scopeID},
+	} {
+		snapshot, err = studio.Connect(ctx, flowID, wire)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, blockID := range []int64{gainID, delayID} {
+		block := findBlock(t, snapshot.Blocks, blockID)
+		input, inputOK := block.InputPort(0)
+		output, outputOK := block.OutputPort(0)
+		if !inputOK || !outputOK || input.Width != width || output.Width != width {
+			t.Fatalf("%s inherited ports = input %#v output %#v, want width %d",
+				block.Name, input, output, width)
+		}
+	}
+
+	run, err := studio.Run(ctx, flowID, SimulationRequest{
+		Duration: 1, SampleTime: fixture.UnitDelay.SampleTime,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.LastRun == nil || len(run.LastRun.Series) != width {
+		t.Fatalf("inherited vector run = %#v", run.LastRun)
+	}
+	for channel := range width {
+		if got := run.LastRun.Series[channel].Values[0]; got != 9 {
+			t.Fatalf("channel %d initial output = %g, want 9", channel, got)
+		}
+		want := 2 * fixture.UnitDelay.Input[channel]
+		for sample := 1; sample < len(run.LastRun.Times); sample++ {
+			if got := run.LastRun.Series[channel].Values[sample]; got != want {
+				t.Fatalf("channel %d sample %d = %g, want %g",
+					channel, sample, got, want)
+			}
+		}
+	}
+}
+
+func TestInheritedUnitDelayRejectsConflictingVectorInitialCondition(t *testing.T) {
+	service := openTestStudio(t, ":memory:")
+	ctx := context.Background()
+	workspace, err := service.CurrentWorkspace(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := service.CreateFlow(ctx, workspace.Project.ID, "Conflicting inherited width")
+	if err != nil {
+		t.Fatal(err)
+	}
+	flowID := created.Snapshot.Flow.ID
+	_, sourceID, err := service.AddBlock(
+		ctx, flowID, BlockVectorConstant, Point{X: 100, Y: 100},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.UpdateBlock(ctx, sourceID, BlockUpdate{
+		Name: "Three-channel source",
+		Parameters: map[string]string{
+			"vector": "1, 2, 3", "output_names": "one, two, three",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, delayID, err := service.AddBlock(
+		ctx, flowID, BlockUnitDelay, Point{X: 350, Y: 100},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.UpdateBlock(ctx, delayID, BlockUpdate{
+		Name: "Conflicting memory",
+		Parameters: map[string]string{
+			"initial_condition": "9, 8",
+			"signal_width_mode": "inherited",
+			"signal_width":      "1",
+			"sample_time_mode":  "explicit",
+			"sample_time":       "0.1",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Connect(ctx, flowID, Wire{
+		SourceID: sourceID, TargetID: delayID,
+	}); err == nil ||
+		!strings.Contains(err.Error(), "Conflicting memory") ||
+		!strings.Contains(err.Error(), "inherits 3 channels") ||
+		!strings.Contains(err.Error(), "requires 2") {
+		t.Fatalf("conflicting inherited initial condition error = %v", err)
+	}
+	after, err := service.Snapshot(ctx, flowID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after.Connections) != 0 {
+		t.Fatalf("conflicting connect persisted %d wires", len(after.Connections))
+	}
+}
+
 func TestLegacyDirectVectorParametersRemainScalar(t *testing.T) {
 	sum, err := decodeParameters(
 		BlockSum,
@@ -394,11 +557,21 @@ func TestLegacyDirectVectorParametersRemainScalar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	gain, err := decodeParameters(
+		BlockGain,
+		`{"parameterSchemaVersion":1,"gain":2}`,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if normalizedDirectSignalWidth(sum) != 1 ||
 		normalizedDirectSignalWidth(delay) != 1 ||
+		normalizedDirectSignalWidth(gain) != 1 ||
+		normalizedSignalWidthMode(delay) != signalWidthExplicit ||
+		normalizedSignalWidthMode(gain) != signalWidthExplicit ||
 		!equalFloatValues(unitDelayInitialState(delay), []float64{4}) {
-		t.Fatalf("legacy direct-vector defaults = Sum %#v Unit Delay %#v",
-			sum, delay)
+		t.Fatalf("legacy direct-vector defaults = Sum %#v Unit Delay %#v Gain %#v",
+			sum, delay, gain)
 	}
 }
 
@@ -425,11 +598,13 @@ func TestAuthoredDirectVectorParametersRoundTrip(t *testing.T) {
 		{
 			kind: BlockUnitDelay,
 			parameters: Parameters{
-				SignalWidth: 3, InitialState: &initial,
+				SignalWidth: 3, SignalWidthMode: string(signalWidthExplicit),
+				InitialState:   &initial,
 				SampleTimeMode: string(sampleTimeInherited),
 			},
 			check: func(parameters Parameters) bool {
 				return normalizedDirectSignalWidth(parameters) == 3 &&
+					normalizedSignalWidthMode(parameters) == signalWidthExplicit &&
 					equalFloatValues(
 						unitDelayInitialState(parameters),
 						[]float64{9, -2, 4},
@@ -533,6 +708,7 @@ func TestDirectVectorValidationRejectsIncompatibleAuthoredShapes(t *testing.T) {
 	}
 	parameters := defaultParameters(BlockUnitDelay)
 	parameters.SignalWidth = 3
+	parameters.SignalWidthMode = string(signalWidthExplicit)
 	initial, err := NewVectorValue([]float64{1, 2})
 	if err != nil {
 		t.Fatal(err)

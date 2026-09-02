@@ -195,6 +195,61 @@ func TestBlockKindSchemaBoundsRejectOneStepOutside(t *testing.T) {
 	}
 }
 
+func TestInheritedSignalWidthFieldsPublishAuthoredMode(t *testing.T) {
+	for _, kind := range []BlockKind{BlockGain, BlockUnitDelay} {
+		schema, ok := kind.Schema()
+		if !ok {
+			t.Fatalf("%s schema is missing", kind)
+		}
+		fields := make(map[string]ParameterSchema, len(schema.Parameters))
+		for _, field := range schema.Parameters {
+			fields[field.Name] = field
+		}
+		mode, modeOK := fields["signal_width_mode"]
+		width, widthOK := fields["signal_width"]
+		if !modeOK || !widthOK {
+			t.Fatalf("%s width fields = %#v", kind, fields)
+		}
+		if mode.Default != "inherited" {
+			t.Fatalf("%s width mode default = %q, want inherited", kind, mode.Default)
+		}
+		if !mode.Optional {
+			t.Fatalf("%s width mode must remain optional for legacy update payloads", kind)
+		}
+		if len(mode.Options) != 2 ||
+			mode.Options[0].Value != "inherited" ||
+			mode.Options[1].Value != "explicit" {
+			t.Fatalf("%s width mode options = %#v", kind, mode.Options)
+		}
+		wantActivation := []ParameterActivation{
+			parameterActivation("signal_width_mode", "explicit"),
+		}
+		if !reflect.DeepEqual(width.ActiveWhen, wantActivation) {
+			t.Fatalf("%s width activation = %#v, want %#v",
+				kind, width.ActiveWhen, wantActivation)
+		}
+
+		legacyValues := make(map[string]string, len(schema.Parameters))
+		for _, field := range schema.Parameters {
+			if field.Name != "signal_width_mode" && field.Default != "" {
+				legacyValues[field.Name] = field.Default
+			}
+		}
+		legacyParameters := defaultParameters(kind)
+		legacyParameters.SignalWidthMode = ""
+		legacy, err := validateBlockUpdate(Block{
+			Kind: kind, Name: "Legacy", Parameters: legacyParameters,
+		}, BlockUpdate{Name: "Legacy", Parameters: legacyValues})
+		if err != nil {
+			t.Fatalf("%s legacy update without signal-width mode: %v", kind, err)
+		}
+		if normalizedSignalWidthMode(legacy.Parameters) != signalWidthExplicit ||
+			normalizedDirectSignalWidth(legacy.Parameters) != 1 {
+			t.Fatalf("%s legacy update parameters = %#v", kind, legacy.Parameters)
+		}
+	}
+}
+
 func sameOptionalFloat(left, right *float64) bool {
 	if left == nil || right == nil {
 		return left == nil && right == nil

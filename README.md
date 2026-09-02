@@ -275,7 +275,7 @@ representative fixtures—is in
 | Sources | Constant | Constant signal | No input |
 | Sources | Vector Constant | Named constant vector | No input |
 | Sources | Sine Wave | Biased sinusoid with amplitude, angular frequency, and phase | No input |
-| Math | Gain | Multiplies its input by `K` | Exactly one |
+| Math | Gain | Applies scalar `K` to an inherited or explicitly sized scalar/1-D vector | Exactly one |
 | Math | Matrix Gain | Named vector relation `y = Du` | One vector input |
 | Math | Mux / Demux | Assemble scalar channels into a named vector, or decompose one | Named scalar ports / one named vector |
 | Math | Selector / Permutation | Select a named subset, or reorder a complete named channel set | One named vector |
@@ -290,7 +290,7 @@ representative fixtures—is in
 | Models | MIMO Transfer Function | Output-row denominators, per-channel numerators and delays | One named vector input |
 | Models | Zero-Pole-Gain | Per-channel zeros, poles, and finite gain matrix | One named vector input |
 | Models | Frequency Response Data | Named complex MIMO samples on an explicit rad/s grid | Frequency-domain workflows only |
-| Discrete | Unit Delay | Exact one-sample scalar or vector state at an explicit or inherited rate | Exactly one |
+| Discrete | Unit Delay | Shape-preserving scalar/1-D state with inherited or explicit width and sample rate | Exactly one |
 | Discrete | Transfer Function | Proper SISO numerator/denominator model in `z` at an explicit or inherited rate | Exactly one |
 | Discrete | State-Space | Named MIMO `x[k+1]=Ax[k]+Bu[k]`, `y[k]=Cx[k]+Du[k]` at an explicit or inherited rate | One named vector input |
 | Discrete | Discretized Transfer | ZOH, FOH, matched pole-zero, or impulse-invariant conversion at an explicit or inherited rate | Exactly one |
@@ -313,6 +313,15 @@ Vector Constant, Vector Scope, State-Space, MIMO Transfer Function,
 Zero-Pole-Gain, and the routing blocks exercise the same named MIMO feedback
 path. Representation dimensions and channel names are validated together, so
 a stored model cannot claim a port width that differs from its realization.
+
+New Gain and Unit Delay blocks inherit one-dimensional width forward from a
+connected source, transitively through Gain/Unit Delay chains, and fall back to
+width one while unconnected. Scalar Gain broadcasts `K`; scalar Unit Delay
+initial conditions broadcast over the effective width. Authors can switch
+either block to an explicit width. Existing saved blocks without a width mode
+remain explicit scalar blocks, while snapshots and runs derive effective width
+without rewriting saved intent. Sum widths and named-MIMO channel metadata
+remain explicitly authored.
 
 State-Space, MIMO Transfer Function, and Zero-Pole-Gain preserve their
 authored parameters while delegating realization and conversion to

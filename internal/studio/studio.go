@@ -250,105 +250,23 @@ func checkWiredInputPorts(ctx context.Context, tx *sql.Tx, block Block) error {
 }
 
 func checkWiredPortCompatibility(ctx context.Context, tx *sql.Tx, changed Block) error {
-	rows, err := tx.QueryContext(ctx, `
-		SELECT source_id, source_port, target_id, target_port
-		FROM connections
-		WHERE source_id = ? OR target_id = ?
-		ORDER BY id`,
-		changed.ID, changed.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("read connected port widths: %w", err)
-	}
-	defer rows.Close()
-
-	var wires []Wire
-	for rows.Next() {
-		var wire Wire
-		if err := rows.Scan(
-			&wire.SourceID, &wire.SourcePort, &wire.TargetID, &wire.TargetPort,
-		); err != nil {
-			return fmt.Errorf("scan connected port widths: %w", err)
-		}
-		wires = append(wires, wire)
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate connected port widths: %w", err)
-	}
-	if err := rows.Close(); err != nil {
-		return fmt.Errorf("close connected port widths: %w", err)
-	}
-	connected, err := blocksConnectedTo(ctx, tx, changed.ID)
+	blocks, connections, err := loadModelGraph(ctx, tx, changed.FlowID)
 	if err != nil {
 		return err
 	}
-	for _, wire := range wires {
-		source := changed
-		if wire.SourceID != changed.ID {
-			var ok bool
-			source, ok = connected[wire.SourceID]
-			if !ok {
-				return fmt.Errorf("load connected source block %d: %w", wire.SourceID, ErrNotFound)
-			}
-		}
-		target := changed
-		if wire.TargetID != changed.ID {
-			var ok bool
-			target, ok = connected[wire.TargetID]
-			if !ok {
-				return fmt.Errorf("load connected target block %d: %w", wire.TargetID, ErrNotFound)
-			}
-		}
-		if err := validateConnectionWidth(
-			source, wire.SourcePort, target, wire.TargetPort,
-		); err != nil {
-			return err
+	found := false
+	for index := range blocks {
+		if blocks[index].ID == changed.ID {
+			blocks[index] = changed
+			found = true
+			break
 		}
 	}
-	return nil
-}
-
-func blocksConnectedTo(
-	ctx context.Context,
-	tx *sql.Tx,
-	blockID int64,
-) (map[int64]Block, error) {
-	rows, err := tx.QueryContext(ctx, `
-		SELECT id, flow_id, kind, name, x, y, parameters_json
-		FROM blocks
-		WHERE id IN (
-			SELECT target_id FROM connections WHERE source_id = ?
-			UNION
-			SELECT source_id FROM connections WHERE target_id = ?
-		)
-		ORDER BY id`,
-		blockID, blockID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("load connected blocks: %w", err)
+	if !found {
+		return ErrNotFound
 	}
-	defer rows.Close()
-
-	blocks := make(map[int64]Block)
-	for rows.Next() {
-		var block Block
-		var encoded string
-		if err := rows.Scan(
-			&block.ID, &block.FlowID, &block.Kind, &block.Name,
-			&block.Position.X, &block.Position.Y, &encoded,
-		); err != nil {
-			return nil, fmt.Errorf("scan connected block: %w", err)
-		}
-		block.Parameters, err = decodeParameters(block.Kind, encoded)
-		if err != nil {
-			return nil, fmt.Errorf("decode parameters for %s: %w", block.Name, err)
-		}
-		blocks[block.ID] = block
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("read connected blocks: %w", err)
-	}
-	return blocks, nil
+	_, err = resolveModelSignalWidths(blocks, connections)
+	return err
 }
 
 func (s *Studio) DeleteBlock(ctx context.Context, blockID int64) (Snapshot, error) {
@@ -552,13 +470,20 @@ func (s *Studio) Connect(ctx context.Context, flowID int64, wire Wire) (Snapshot
 		if !target.hasInputPort(wire.TargetPort) {
 			return invalid("%s has no input port %d", target.Name, wire.TargetPort)
 		}
-		if err := validateConnectionWidth(
-			source, wire.SourcePort, target, wire.TargetPort,
-		); err != nil {
+		var duplicate int
+		blocks, connections, err := loadModelGraph(ctx, tx, flowID)
+		if err != nil {
+			return err
+		}
+		connections = append(connections, Connection{
+			FlowID:   flowID,
+			SourceID: wire.SourceID, SourcePort: wire.SourcePort,
+			TargetID: wire.TargetID, TargetPort: wire.TargetPort,
+		})
+		if _, err := resolveModelSignalWidths(blocks, connections); err != nil {
 			return err
 		}
 
-		var duplicate int
 		err = tx.QueryRowContext(ctx, `
 			SELECT COUNT(*) FROM connections
 			WHERE flow_id = ? AND source_id = ? AND source_port = ?

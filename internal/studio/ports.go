@@ -81,7 +81,11 @@ func (b Block) portSchema() blockPortSchema {
 	if !ok {
 		return blockPortSchema{}
 	}
-	return definition.ports(b.Parameters).copy()
+	parameters := b.Parameters
+	if b.resolvedSignalWidth > 0 {
+		parameters.SignalWidth = b.resolvedSignalWidth
+	}
+	return definition.ports(parameters).copy()
 }
 
 func (b Block) InputPort(port int) (SignalPort, bool) {

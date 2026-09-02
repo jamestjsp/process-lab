@@ -185,6 +185,14 @@ func compileRequestedModel(
 		return nil, invalid("select at least one output signal before compiling")
 	}
 
+	widthResolvedBlocks, err := resolveModelSignalWidths(authoredBlocks, connections)
+	if err != nil {
+		return nil, err
+	}
+	for _, block := range widthResolvedBlocks {
+		blockByID[block.ID] = block
+	}
+
 	for _, connection := range connections {
 		source, sourceOK := blockByID[connection.SourceID]
 		target, targetOK := blockByID[connection.TargetID]
@@ -203,7 +211,7 @@ func compileRequestedModel(
 	}
 
 	resolvedBlocks, sampleTimes, err := resolveModelSampleTimes(
-		authoredBlocks, connections, request.baseStep,
+		widthResolvedBlocks, connections, request.baseStep,
 	)
 	if err != nil {
 		return nil, err
@@ -288,7 +296,11 @@ func compileRequestedModel(
 		states, _, _ := system.Dims()
 		blockInitialState := make([]float64, states)
 		if initial := blockDefinitions[block.Kind].initialState; initial != nil {
-			authored := initial(block.Parameters)
+			parameters := block.Parameters
+			if block.resolvedSignalWidth > 0 {
+				parameters.SignalWidth = block.resolvedSignalWidth
+			}
+			authored := initial(parameters)
 			if authored != nil && len(authored) != states {
 				return nil, fmt.Errorf(
 					"%s initial state has %d values for %d realization states",

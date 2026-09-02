@@ -154,34 +154,51 @@ These analytic values are not MATLAB or Simulink output.
 
 The direct Sum counterpart uses the documented default `+` sign and accepts
 either a `+`/`-` list or a positive numeric input count. Multi-input vectors of
-one authored width are added or subtracted elementwise. A one-port vector uses
-the documented Sum-of-elements behavior and produces a scalar. Process Lab
-authors width explicitly because it does not yet have diagram-wide inherited
-dimension propagation. Mixed scalar/vector expansion, matrices, sign-list
-spacers, and specified-dimension reduction remain outside this subset.
+one explicit authored width are added or subtracted elementwise. A one-port
+vector uses the documented Sum-of-elements behavior and produces a scalar.
+Mixed scalar/vector expansion, matrices, sign-list spacers, and
+specified-dimension reduction remain outside this subset. Sum is deliberately
+not part of width inheritance because its input expansion and reduction policy
+is not shape-preserving.
 
-Unit Delay accepts the same explicit scalar or vector width. Its scalar initial
-condition broadcasts across the vector unless a one-value or width-matched
-vector initial condition is authored. In inherited-rate mode, Unit Delay uses
-the model-level resolver shared by Discrete Transfer Function, Discrete
-State-Space, Discretized Transfer, and Thiran Transport Delay. A connected
-explicit rate propagates in either direction through neutral and inherited
-blocks; if no such context exists, the public run step is used as before. The
-authored block remains inherited in saved-model and run provenance. Saved Sum
-and Unit Delay blocks without a width remain scalar, so opening an existing
-diagram does not change its ports or response.
+Simulink determines inherited signal properties while compiling a diagram and
+generally lets nonsource block outputs follow supported input dimensions and
+scalar expansion. Process Lab implements the smallest useful part of that
+contract with one whole-model authority: newly authored scalar-parameter Gain
+and Unit Delay blocks inherit one-dimensional width forward from a connected
+source, transitively through Gain/Unit Delay chains and fan-out. Scalar Gain
+broadcasts `K` as `K*I(width)`; Unit Delay preserves the input width and
+broadcasts a scalar initial condition. Authors can select explicit width
+instead. Inherited width is bounded to 1..16 and does not back-propagate from a
+fixed sink, infer channel names, solve cycles, or cover matrices, rank,
+orientation, or variable-size signals.
 
-Vector Sum, Vector Constant, Matrix Gain, Mux, Demux, Selector, Permutation, and
-Vector Scope remain intentional Process-Lab-specific named-channel
-specializations. Their channel labels are authored routing metadata rather than
-an assertion of direct Simulink block parity. Vector Sum keeps elementwise
-behavior even with one input; users choose direct Sum when they need documented
-one-input reduction.
+An unconnected inherited block displays width one. A non-scalar Unit Delay
+initial condition can provide a known width, and a conflicting upstream width
+is rejected before a wire, edit, or document is persisted. Snapshots and
+realizations use resolved copies; dump/apply keeps the authored inherited mode
+and does not rewrite the effective width. Existing schema-v1 Gain and Unit
+Delay blocks without a width mode remain explicit scalar width-one blocks.
+
+The signal-dimension policy follows MathWorks'
+[signal propagation](https://www.mathworks.com/help/simulink/ug/how-simulink-signals-propagate-in-a-model.html)
+and [output dimension](https://www.mathworks.com/help/simulink/ug/determining-output-signal-dimensions.html)
+documentation, accessed 2026-08-30. Unit Delay's independent inherited-rate
+mode still uses the sample-time resolver shared by PID, PID2, Discrete Transfer
+Function, Discrete State-Space, Discretized Transfer, and Thiran Transport
+Delay.
+
+Vector Sum, Vector Constant, Matrix Gain, Mux, Demux, Selector, Permutation,
+Vector Scope, and the named-MIMO model blocks remain intentional
+Process-Lab-specific named-channel specializations. Their channel labels and
+widths remain authored routing metadata. Vector Sum keeps elementwise behavior
+even with one input; users choose direct Sum for documented one-input reduction.
 
 The executable fixture checks scalar Sum, numeric input-count shorthand,
-elementwise vector Sum, one-input vector reduction, and vector Unit Delay
-history through public Studio operations. Expected values come from the
-documented Sum and Unit Delay equations and are not MATLAB or Simulink output.
+elementwise vector Sum, one-input vector reduction, vector Unit Delay history,
+and transitive Vector Constant -> Gain -> Unit Delay inherited widths through
+public Studio operations. Expected values follow the documented Sum, Unit
+Delay, and dimension contracts and are analytic, not MATLAB or Simulink output.
 
 ## Fixture layout
 

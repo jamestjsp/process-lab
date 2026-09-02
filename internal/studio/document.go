@@ -186,9 +186,6 @@ func validateDocumentWires(wires []DocumentWire, blocks map[string]documentBlock
 		if wire.TargetPort < 0 || !target.Block.hasInputPort(wire.TargetPort) {
 			return invalid("%s has no input port %d", target.Block.Name, wire.TargetPort)
 		}
-		if err := validateConnectionWidth(source.Block, wire.SourcePort, target.Block, wire.TargetPort); err != nil {
-			return err
-		}
 		wireKey := documentWireIdentity{
 			source: wire.Source, sourcePort: wire.SourcePort,
 			target: wire.Target, targetPort: wire.TargetPort,
@@ -206,7 +203,37 @@ func validateDocumentWires(wires []DocumentWire, blocks map[string]documentBlock
 		}
 		occupied[portKey] = struct{}{}
 	}
-	return nil
+	return validateDocumentSignalWidths(wires, blocks)
+}
+
+func validateDocumentSignalWidths(
+	wires []DocumentWire,
+	blocks map[string]documentBlockState,
+) error {
+	names := make([]string, 0, len(blocks))
+	for name := range blocks {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	ids := make(map[string]int64, len(names))
+	modelBlocks := make([]Block, 0, len(names))
+	for index, name := range names {
+		id := int64(index + 1)
+		block := blocks[name].Block
+		block.ID = id
+		ids[name] = id
+		modelBlocks = append(modelBlocks, block)
+	}
+	modelConnections := make([]Connection, 0, len(wires))
+	for _, wire := range wires {
+		modelConnections = append(modelConnections, Connection{
+			SourceID: ids[wire.Source], SourcePort: wire.SourcePort,
+			TargetID: ids[wire.Target], TargetPort: wire.TargetPort,
+		})
+	}
+	_, err := resolveModelSignalWidths(modelBlocks, modelConnections)
+	return err
 }
 
 func planDocument(snapshot Snapshot, states []documentBlockState, byName map[string]documentBlockState, document FlowDocument) FlowApplyResult {
