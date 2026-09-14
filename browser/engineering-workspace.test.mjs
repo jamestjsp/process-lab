@@ -369,8 +369,9 @@ test("context-menu flip swaps ports and survives reload without reflecting label
     const card = page.locator('.block-card').filter({has: page.locator('.port-input')}).filter({has: page.locator('.port-output')}).first();
     const id = await card.getAttribute('data-block-id');
     await card.click({button:'right'});
-    await page.getByRole('menuitem', {name:'Flip horizontally',exact:true}).click();
+    await page.getByRole('menuitem', {name:'Flip horizontally',exact:true}).press('Enter');
     await page.waitForSelector(`#block-card-${id}[data-mirrored="true"]`);
+    await page.waitForFunction(id => document.activeElement?.id === `block-card-${id}`, id);
     await page.reload();
     const saved = page.locator(`#block-card-${id}`);
     assert.equal(await saved.getAttribute('data-mirrored'), 'true');
@@ -379,7 +380,7 @@ test("context-menu flip swaps ports and survives reload without reflecting label
     assert.ok(input.x > output.x);
     assert.equal(await saved.evaluate(node => getComputedStyle(node).transform), 'none');
     await saved.click({button:'right'});
-    await page.getByRole('menuitem', {name:'Flip horizontally',exact:true}).click();
+    await page.getByRole('menuitem', {name:'Flip horizontally',exact:true}).press('Enter');
     await page.waitForSelector(`#block-card-${id}[data-mirrored="false"]`);
     assert.deepEqual(problems, []);
   } finally { await page.close(); }

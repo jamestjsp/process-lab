@@ -257,3 +257,20 @@ test('routes every horizontal port orientation outside the endpoint blocks', () 
     assert.ok((points.at(-2).x - end.x) * targetDirection > 0)
   }
 })
+
+test('mirrored ports at sheet boundaries turn along the edge without crossing blocks', () => {
+  const bounds = {left: 0, top: 0, right: 1000, bottom: 800}
+  for (const [source, target, start, end] of [
+    [block(0, 200), block(400, 400), {x:0,y:242,direction:-1}, {x:400,y:442,direction:-1}],
+    [block(400, 200), block(828, 400), {x:572,y:242,direction:1}, {x:1000,y:442,direction:1}],
+    [block(0, 200), block(828, 400), {x:0,y:242,direction:-1}, {x:1000,y:442,direction:1}]
+  ]) {
+    const points = routeOrthogonal({start, end, obstacles:[source,target], bounds})
+    assertOrthogonal(points)
+    for (const point of points) assert.ok(point.x >= 0 && point.x <= 1000 && point.y >= 0 && point.y <= 800)
+    for (const {a,b} of routeSegments(points)) {
+      assert.equal(segmentEntersRect(a,b,source), false)
+      assert.equal(segmentEntersRect(a,b,target), false)
+    }
+  }
+})

@@ -19,7 +19,7 @@ function menuItems(node, point) {
     const plural = selectionSize() > 1 ? ` ${selectionSize()} blocks` : ''
     return [
       { label: 'Rename', run: () => editBlock(node) },
-      { label: 'Flip horizontally', run: () => htmx.ajax('POST', `/blocks/${node.dataset.blockId}/flip`, { target: '#workbench', swap: 'outerMorph' }) },
+      { label: 'Flip horizontally', run: () => flipBlock(node) },
       { label: `Duplicate${plural}`, run: duplicateSelection },
       { label: 'Disconnect all wires', run: () => disconnectBlock(node) },
       { label: `Fit to${plural || ' this block'}`, run: fitSelection },
@@ -58,6 +58,16 @@ function paletteChoices(point) {
       }
     }
   })
+}
+
+async function flipBlock(node) {
+  const id = node.dataset.blockId
+  await htmx.ajax('POST', `/blocks/${id}/flip`, { target: '#workbench', swap: 'outerMorph' })
+  const block = document.getElementById(`block-card-${id}`)
+  if (block) {
+    block.tabIndex = -1
+    block.focus({ preventScroll: true })
+  }
 }
 
 function disconnectBlock(node) {
