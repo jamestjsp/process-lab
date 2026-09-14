@@ -1,10 +1,10 @@
 module github.com/jamestjsp/process-lab
 
-go 1.26.3
+go 1.27.1
 
 require (
-	github.com/jamestjsp/controlsys v1.3.0
-	gonum.org/v1/gonum v0.15.0
+	github.com/jamestjsp/controlsys v1.5.1
+	gonum.org/v1/gonum v0.17.0
 	modernc.org/sqlite v1.54.0
 )
 
@@ -20,4 +20,4 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-replace gonum.org/v1/gonum => github.com/jamestjsp/gonum v0.17.7-fork
+replace gonum.org/v1/gonum => github.com/jamestjsp/gonum v0.19.0-fork

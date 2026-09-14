@@ -17,7 +17,7 @@ The expected steady-state value is `1.8 + (0.3 × -0.7) = 1.59`, which is also a
 
 Requirements:
 
-- Go 1.26.3 or newer
+- Go 1.27.1 or newer
 
 ```bash
 go run ./cmd/processlab serve
