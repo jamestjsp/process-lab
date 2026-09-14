@@ -237,7 +237,7 @@ viewport at 25%–400%.
 | `Alt` + drag | Suspend alignment magnetism (still snaps to the grid) |
 | Drag a specific output port to a specific input port | Wire a signal to that terminal |
 | Click output, then input | Wire without dragging; Enter or Space works on focused ports |
-| Right-click | Context menu on a block or on the canvas |
+| Right-click | Context menu on a block or on the canvas; Flip horizontally swaps a block’s port sides |
 
 | Keys | Action |
 | --- | --- |
@@ -660,3 +660,6 @@ re-sort the strip — 46 checks. Rendering was confirmed at 1440, 1280, 860, and
 620px on both pages.
 
 Note that templates and static assets are `go:embed`-ed into the binary, so a change to `static/js/*.js` or `app.css` needs a rebuild before the server serves it.
+
+The [cascade reactor example](examples/README.md) combines nested PI feedback,
+delayed recycle, and mirrored blocks in a reproducible CLI flowsheet.

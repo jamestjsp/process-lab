@@ -1,0 +1,411 @@
+{
+  "version": 1,
+  "blocks": [
+    {
+      "name": "Temperature setpoint",
+      "kind": "source",
+      "position": {
+        "x": 80,
+        "y": 160
+      },
+      "parameters": {
+        "amplitude": "1",
+        "initial_value": "0",
+        "step_time": "5"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Temperature error",
+      "kind": "sum",
+      "position": {
+        "x": 320,
+        "y": 160
+      },
+      "parameters": {
+        "signs": "+-",
+        "signal_width": "1"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Temperature PI",
+      "kind": "pid",
+      "position": {
+        "x": 560,
+        "y": 160
+      },
+      "parameters": {
+        "proportional": "0.8",
+        "integral": "0.05",
+        "derivative": "0",
+        "filter_coefficient": "20",
+        "time_domain": "continuous",
+        "sample_time": "0.1",
+        "sample_time_mode": "explicit"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Flow error",
+      "kind": "sum",
+      "position": {
+        "x": 800,
+        "y": 160
+      },
+      "parameters": {
+        "signs": "+-",
+        "signal_width": "1"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Flow PI",
+      "kind": "pid",
+      "position": {
+        "x": 1040,
+        "y": 160
+      },
+      "parameters": {
+        "proportional": "1.5",
+        "integral": "0.7",
+        "derivative": "0",
+        "filter_coefficient": "20",
+        "time_domain": "continuous",
+        "sample_time": "0.1",
+        "sample_time_mode": "explicit"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Control valve",
+      "kind": "lag",
+      "position": {
+        "x": 1280,
+        "y": 160
+      },
+      "parameters": {
+        "time_constant": "0.5"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Jacket flow",
+      "kind": "lag",
+      "position": {
+        "x": 1520,
+        "y": 160
+      },
+      "parameters": {
+        "time_constant": "1.5"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Heat balance",
+      "kind": "sum",
+      "position": {
+        "x": 1760,
+        "y": 160
+      },
+      "parameters": {
+        "signs": "+++",
+        "signal_width": "1"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Heat exchanger",
+      "kind": "lag",
+      "position": {
+        "x": 2000,
+        "y": 160
+      },
+      "parameters": {
+        "time_constant": "5"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Reactor thermal mass",
+      "kind": "lag",
+      "position": {
+        "x": 2240,
+        "y": 160
+      },
+      "parameters": {
+        "time_constant": "12"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Reactor temperature",
+      "kind": "scope",
+      "position": {
+        "x": 2480,
+        "y": 160
+      },
+      "parameters": {},
+      "mirrored": false
+    },
+    {
+      "name": "Flow transmitter",
+      "kind": "lag",
+      "position": {
+        "x": 1280,
+        "y": 380
+      },
+      "parameters": {
+        "time_constant": "0.2"
+      },
+      "mirrored": true
+    },
+    {
+      "name": "Temperature transmitter",
+      "kind": "lag",
+      "position": {
+        "x": 800,
+        "y": 620
+      },
+      "parameters": {
+        "time_constant": "0.5"
+      },
+      "mirrored": true
+    },
+    {
+      "name": "Recycle transport",
+      "kind": "delay",
+      "position": {
+        "x": 2000,
+        "y": 620
+      },
+      "parameters": {
+        "delay": "2",
+        "initial_output": "0",
+        "delay_mode": "exact",
+        "sample_time": "0.1",
+        "sample_time_mode": "explicit",
+        "approximation": "3"
+      },
+      "mirrored": true
+    },
+    {
+      "name": "Recycle fraction",
+      "kind": "gain",
+      "position": {
+        "x": 1760,
+        "y": 620
+      },
+      "parameters": {
+        "gain": "0.15"
+      },
+      "mirrored": true
+    },
+    {
+      "name": "Heat-load step",
+      "kind": "source",
+      "position": {
+        "x": 1280,
+        "y": 840
+      },
+      "parameters": {
+        "amplitude": "-0.2",
+        "initial_value": "0",
+        "step_time": "80"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Load dynamics",
+      "kind": "lag",
+      "position": {
+        "x": 1520,
+        "y": 840
+      },
+      "parameters": {
+        "time_constant": "3"
+      },
+      "mirrored": false
+    },
+    {
+      "name": "Valve command",
+      "kind": "scope",
+      "position": {
+        "x": 1040,
+        "y": 1020
+      },
+      "parameters": {},
+      "mirrored": false
+    },
+    {
+      "name": "Measured flow",
+      "kind": "scope",
+      "position": {
+        "x": 1520,
+        "y": 1020
+      },
+      "parameters": {},
+      "mirrored": false
+    },
+    {
+      "name": "Temperature demand",
+      "kind": "scope",
+      "position": {
+        "x": 560,
+        "y": 1020
+      },
+      "parameters": {},
+      "mirrored": false
+    },
+    {
+      "name": "Recycle heat",
+      "kind": "scope",
+      "position": {
+        "x": 2000,
+        "y": 1020
+      },
+      "parameters": {},
+      "mirrored": false
+    }
+  ],
+  "wires": [
+    {
+      "source": "Temperature setpoint",
+      "sourcePort": 0,
+      "target": "Temperature error",
+      "targetPort": 0
+    },
+    {
+      "source": "Temperature error",
+      "sourcePort": 0,
+      "target": "Temperature PI",
+      "targetPort": 0
+    },
+    {
+      "source": "Temperature PI",
+      "sourcePort": 0,
+      "target": "Flow error",
+      "targetPort": 0
+    },
+    {
+      "source": "Flow error",
+      "sourcePort": 0,
+      "target": "Flow PI",
+      "targetPort": 0
+    },
+    {
+      "source": "Flow PI",
+      "sourcePort": 0,
+      "target": "Control valve",
+      "targetPort": 0
+    },
+    {
+      "source": "Control valve",
+      "sourcePort": 0,
+      "target": "Jacket flow",
+      "targetPort": 0
+    },
+    {
+      "source": "Jacket flow",
+      "sourcePort": 0,
+      "target": "Heat balance",
+      "targetPort": 0
+    },
+    {
+      "source": "Heat balance",
+      "sourcePort": 0,
+      "target": "Heat exchanger",
+      "targetPort": 0
+    },
+    {
+      "source": "Heat exchanger",
+      "sourcePort": 0,
+      "target": "Reactor thermal mass",
+      "targetPort": 0
+    },
+    {
+      "source": "Reactor thermal mass",
+      "sourcePort": 0,
+      "target": "Reactor temperature",
+      "targetPort": 0
+    },
+    {
+      "source": "Jacket flow",
+      "sourcePort": 0,
+      "target": "Flow transmitter",
+      "targetPort": 0
+    },
+    {
+      "source": "Reactor thermal mass",
+      "sourcePort": 0,
+      "target": "Temperature transmitter",
+      "targetPort": 0
+    },
+    {
+      "source": "Reactor thermal mass",
+      "sourcePort": 0,
+      "target": "Recycle transport",
+      "targetPort": 0
+    },
+    {
+      "source": "Recycle transport",
+      "sourcePort": 0,
+      "target": "Recycle fraction",
+      "targetPort": 0
+    },
+    {
+      "source": "Heat-load step",
+      "sourcePort": 0,
+      "target": "Load dynamics",
+      "targetPort": 0
+    },
+    {
+      "source": "Flow PI",
+      "sourcePort": 0,
+      "target": "Valve command",
+      "targetPort": 0
+    },
+    {
+      "source": "Jacket flow",
+      "sourcePort": 0,
+      "target": "Measured flow",
+      "targetPort": 0
+    },
+    {
+      "source": "Temperature PI",
+      "sourcePort": 0,
+      "target": "Temperature demand",
+      "targetPort": 0
+    },
+    {
+      "source": "Recycle fraction",
+      "sourcePort": 0,
+      "target": "Recycle heat",
+      "targetPort": 0
+    },
+    {
+      "source": "Flow transmitter",
+      "sourcePort": 0,
+      "target": "Flow error",
+      "targetPort": 1
+    },
+    {
+      "source": "Temperature transmitter",
+      "sourcePort": 0,
+      "target": "Temperature error",
+      "targetPort": 1
+    },
+    {
+      "source": "Recycle fraction",
+      "sourcePort": 0,
+      "target": "Heat balance",
+      "targetPort": 1
+    },
+    {
+      "source": "Load dynamics",
+      "sourcePort": 0,
+      "target": "Heat balance",
+      "targetPort": 2
+    }
+  ]
+}
