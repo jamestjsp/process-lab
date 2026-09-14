@@ -152,8 +152,11 @@ function endpointOwner(point, obstacles, output) {
   })
 }
 
-function stubEnd(point, direction, length, obstacles, owner) {
-  let distance = length
+function stubEnd(point, direction, length, obstacles, owner, bounds) {
+  // At the sheet edge the wire must turn along its owner instead of leaving the canvas.
+  let distance = bounds
+    ? Math.min(length, direction > 0 ? bounds.right - point.x : point.x - bounds.left)
+    : length
   obstacles.forEach((rect, index) => {
     if (index === owner || point.y <= rect.top + EPSILON || point.y >= rect.bottom - EPSILON) return
     if (direction > 0) {
@@ -621,8 +624,8 @@ function chooseCandidate(
 function fallbackRoute(start, end, obstacles, bounds, options) {
   const sourceOwner = endpointOwner(start, obstacles, options.sourceDirection > 0)
   const targetOwner = endpointOwner(end, obstacles, options.targetDirection > 0)
-  const sourceExit = stubEnd(start, options.sourceDirection, options.portStub, obstacles, sourceOwner)
-  const targetEntry = stubEnd(end, options.targetDirection, options.portStub, obstacles, targetOwner)
+  const sourceExit = stubEnd(start, options.sourceDirection, options.portStub, obstacles, sourceOwner, bounds)
+  const targetEntry = stubEnd(end, options.targetDirection, options.portStub, obstacles, targetOwner, bounds)
   return chooseCandidate(
     start,
     end,
@@ -649,8 +652,8 @@ function routeWithClearance(
   const expanded = obstacles.map((rect) => inflateRect(rect, clearance))
   const sourceOwner = endpointOwner(source, obstacles, options.sourceDirection > 0)
   const targetOwner = endpointOwner(target, obstacles, options.targetDirection > 0)
-  const sourceExit = stubEnd(source, options.sourceDirection, options.portStub, expanded, sourceOwner)
-  const targetEntry = stubEnd(target, options.targetDirection, options.portStub, expanded, targetOwner)
+  const sourceExit = stubEnd(source, options.sourceDirection, options.portStub, expanded, sourceOwner, bounds)
+  const targetEntry = stubEnd(target, options.targetDirection, options.portStub, expanded, targetOwner, bounds)
   if (sourceOwner >= 0 && (sourceExit.x - source.x) * options.sourceDirection < clearance - EPSILON) return null
   if (targetOwner >= 0 && (targetEntry.x - target.x) * options.targetDirection < clearance - EPSILON) return null
   const isClear = obstacleIndex
