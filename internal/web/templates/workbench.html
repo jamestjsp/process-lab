@@ -97,7 +97,7 @@
 <main id="workbench" class="workbench" data-flow-id="{{.Snapshot.Flow.ID}}" data-workbench-mode="{{.Mode.Name}}" data-canonical-path="{{.Mode.CanonicalPath}}" data-selected-id="{{if .Selected}}{{.Selected.ID}}{{end}}" data-rail-left="expanded" data-rail-right="expanded" data-dock="expanded" hx-status:4xx:inherited="swap:none" hx-status:5xx:inherited="swap:none">
   <header class="topbar">
     <a class="brand" href="/" aria-label="Process Lab home">
-      <span class="brand-mark"><i></i><i></i><i></i></span>
+      <img class="brand-mark" src="/assets/favicon.svg" width="34" height="34" alt="" aria-hidden="true">
       <span>
         <strong>Process Lab</strong>
         <small>Simulation, design &amp; analysis</small>
@@ -135,6 +135,14 @@
         </div>
       </details>
     </div>
+    {{if .BoundedEdit}}<hx-partial hx-target="#project-facts" hx-swap="outerMorph">{{end}}
+    <div class="project-facts" id="project-facts">
+      <span><b>{{.BlockCount}}</b> blocks</span>
+      <span><b>{{.ConnectionCount}}</b> signals</span>
+      <span class="saved-state"><i></i> saved {{.Updated}}</span>
+    </div>
+    {{if .BoundedEdit}}</hx-partial>{{end}}
+    <div class="appearance-controls">
     <div class="shell-toggles" role="group" aria-label="Workspace panels">
       <button type="button" class="shell-toggle" data-rail-toggle="left" aria-controls="palette-rail" aria-expanded="true" title="Collapse the block library">
         <span class="shell-toggle-glyph" aria-hidden="true">▤</span>
@@ -149,13 +157,8 @@
         <span class="shell-toggle-label">Inspector</span>
       </button>
     </div>
-    {{if .BoundedEdit}}<hx-partial hx-target="#project-facts" hx-swap="outerMorph">{{end}}
-    <div class="project-facts" id="project-facts">
-      <span><b>{{.BlockCount}}</b> blocks</span>
-      <span><b>{{.ConnectionCount}}</b> signals</span>
-      <span class="saved-state"><i></i> saved {{.Updated}}</span>
+    {{template "theme-picker"}}
     </div>
-    {{if .BoundedEdit}}</hx-partial>{{end}}
   </header>
 
   {{if .Error}}

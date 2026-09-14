@@ -4,10 +4,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="light dark">
   <meta name="htmx-config" content='{"defaultSettleDelay":0}'>
   <title>Drawing register · Process Lab</title>
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <script src="/assets/theme.js"></script>
   <link rel="stylesheet" href="/assets/tokens.css">
   <link rel="stylesheet" href="/assets/register.css">
   <script src="/assets/htmx-4.0.0.min.js"></script>
@@ -22,7 +23,7 @@
   hx-status:5xx:inherited="swap:none">
   <header class="register-bar">
     <a class="brand" href="/" aria-label="Process Lab home">
-      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <img class="brand-mark" src="/assets/favicon.svg" width="34" height="34" alt="" aria-hidden="true">
       <span class="brand-words">
         <strong>Process Lab</strong>
         <small>Simulation, design &amp; analysis</small>
@@ -31,6 +32,7 @@
     <!-- The real create form is the register's next free line. Without
          JavaScript this anchor still walks the reader to it. -->
     <a class="bar-action" href="#new-project-name" data-focus-new-project>+ New project</a>
+    {{template "theme-picker"}}
   </header>
 
   <main class="register-main">
