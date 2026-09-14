@@ -18,6 +18,7 @@ import { showInspector } from './shell.js'
 
 const selection = new Set()
 let marquee = null
+let pendingSelection = null
 
 export const selectionSize = () => selection.size
 export const isSelected = (id) => selection.has(id)
@@ -162,10 +163,17 @@ export function selectBlock(node) {
   const root = workbench()
   if (!root || !node) return
   setSelection([node.dataset.blockId])
-  return htmx.ajax('GET', `/flows/${root.dataset.flowId}/workbench?selected=${node.dataset.blockId}`, {
+  const key = `${root.dataset.flowId}:${node.dataset.blockId}`
+  if (pendingSelection?.key === key) return pendingSelection.promise
+  const request = { key }
+  request.promise = Promise.resolve(htmx.ajax('GET', `/flows/${root.dataset.flowId}/workbench?selected=${node.dataset.blockId}`, {
     target: '#workbench',
     swap: 'outerMorph'
+  })).finally(() => {
+    if (pendingSelection === request) pendingSelection = null
   })
+  pendingSelection = request
+  return request.promise
 }
 
 export async function editBlock(node) {

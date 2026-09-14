@@ -127,14 +127,17 @@ describe("engineering workspace", () => {
       await seriesButton.click();
       assert.equal(await plot.locator(`[data-series-path="${seriesKey}"]`).getAttribute("hidden"), null);
 
-      const svg = plot.locator("svg");
+      const svg = plot.locator("svg:not([aria-hidden])");
       const originalViewBox = await svg.getAttribute("viewBox");
+      const originalRange = await plot.getAttribute("data-x-max");
       await plot.locator("[data-chart-zoom-in]").click();
-      assert.notEqual(await svg.getAttribute("viewBox"), originalViewBox);
+      assert.equal(await svg.getAttribute("viewBox"), originalViewBox);
+      assert.notEqual(await plot.getAttribute("data-x-max"), originalRange);
       await plot.locator("[data-chart-characteristics]").click();
       assert.equal(await plot.locator("[data-chart-characteristic-lines]").getAttribute("hidden"), "");
       await plot.locator("[data-chart-reset]").click();
       assert.equal(await svg.getAttribute("viewBox"), originalViewBox);
+      assert.equal(await plot.getAttribute("data-x-max"), originalRange);
       assert.deepEqual(problems, []);
     } finally {
       await page.close();
@@ -318,4 +321,44 @@ describe("engineering workspace", () => {
       await page.close();
     }
   });
+});
+
+test("double-click waits for a delayed selection without duplicate requests", async () => {
+  const {page, problems} = await openWorkbench();
+  try {
+    let requests = 0;
+    await page.route('**/workbench?selected=*', async route => {
+      requests++;
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await route.continue();
+    });
+    const card = page.locator('.block-card').last();
+    const id = await card.getAttribute('data-block-id');
+    await card.dblclick();
+    await page.waitForFunction(id => document.querySelector('#workbench').dataset.selectedId === id &&
+      document.activeElement?.matches('.property-form input[name="name"]'), id);
+    assert.equal(requests, 1);
+    assert.deepEqual(problems, []);
+  } finally { await page.close(); }
+});
+
+test("zoom recreates clipping after a real workbench morph", async () => {
+  const {page, problems} = await openWorkbench();
+  try {
+    await installMultiTrendFlow(page);
+    const plot = page.locator('[data-plot-id="simulation-trend"]');
+    await plot.locator('[data-chart-zoom-in]').click();
+    await page.evaluate(() => {
+      window.previousPlotSVG = document.querySelector('[data-plot-id="simulation-trend"] svg:not([aria-hidden])');
+      return htmx.ajax('GET', '/flows/1/workbench?view=simulation', {target:'#workbench',swap:'outerMorph'});
+    });
+    await plot.locator('[data-chart-zoom-in]').click();
+    assert.equal(await plot.evaluate(root => {
+      const svg = root.querySelector('svg:not([aria-hidden])');
+      const path = svg.querySelector('[data-series-path]');
+      const clip = path.getAttribute('clip-path');
+      return svg === window.previousPlotSVG && !!clip && !!svg.querySelector(clip.slice(4, -1));
+    }), true);
+    assert.deepEqual(problems, []);
+  } finally { await page.close(); }
 });
