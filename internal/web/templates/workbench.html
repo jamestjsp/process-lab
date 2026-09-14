@@ -178,8 +178,12 @@
         <h2>Model blocks</h2>
         <p>Add a block, then wire output ports to inputs.</p>
       </div>
-      <div class="palette-list">
+      <div class="palette-list" id="block-catalogue">
         {{range .Palette}}
+        <label class="palette-search" for="block-search">Find a block
+          <input id="block-search" type="search" placeholder="Name, category, or description" autocomplete="off" aria-controls="block-catalogue" aria-describedby="block-search-status">
+        </label>
+        <small id="block-search-status" role="status" aria-live="polite"></small>
         <form method="post" action="/flows/{{$.Snapshot.Flow.ID}}/blocks?view={{$.Mode.Name}}" hx-post="/flows/{{$.Snapshot.Flow.ID}}/blocks?view={{$.Mode.Name}}" hx-target="#workbench" hx-swap="outerMorph">
           <input type="hidden" name="kind" value="{{.Kind}}">
           <input type="hidden" name="x" value="{{.X}}">
@@ -386,7 +390,7 @@
             </div>
           </div>
           {{else}}
-          <div class="empty-results"><span class="empty-wave">⌁</span><div><strong>No run yet</strong><p>Wire the model, then run a time-domain simulation.</p></div><span class="empty-arrow">→</span></div>
+          <div class="empty-results"><span class="empty-wave">⌁</span><div>{{if .RecentRuns}}<strong>Model changed — run again</strong><p>Run the model to update the plot. Previous runs remain available below.</p>{{else}}<strong>No run yet</strong><p>Wire the model, then run a time-domain simulation.</p>{{end}}</div><span class="empty-arrow">→</span></div>
           {{end}}
           {{template "run-history" .}}
         </section>

@@ -185,11 +185,20 @@ subflowsheet or subsystem blocks inside a flowsheet are not yet supported.
 3. Drag from an orange output port to a gray input port to wire a signal.
    A Sum draws one labeled input port per `+`/`-` sign.
 4. Click a block to edit its name or numerical parameter in the inspector.
+   Double-click it to open the inspector even when its rail is collapsed.
 5. Drag a block. It snaps to the grid and shows guides when it lines up with a neighbour.
 6. Drag a box around several blocks and move them together.
 7. Collapse the side rails and drag the dock down to give the sheet the whole window.
 
 Press `?` for the full shortcut sheet.
+
+Use **Find a block** in the library to search names, categories, and descriptions.
+All words must match; for example, `vector gain` narrows the catalogue to vector
+gain blocks. Press `Down` to focus the first result, then `Enter` to add it, or
+`Escape` to clear the search. The filter survives edits on the same sheet and
+clears when switching sheets or reloading. After changing a previously simulated
+model, **Model changed — run again** prompts a fresh run while earlier runs stay
+available below the plot.
 
 ## Workbench interaction
 

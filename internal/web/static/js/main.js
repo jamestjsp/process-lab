@@ -21,6 +21,7 @@ import { applyShellState, initShell } from './shell.js'
 import { applySeriesVisibility } from './charts.js'
 import { cancelConnection, hasConnectionSource } from './wiring.js'
 import { onBeforeSwap, onReapply } from './reapply.js'
+import { applyLibrarySearch } from './library.js'
 import './contextmenu.js'
 import './input.js'
 
@@ -55,6 +56,7 @@ onReapply(() => {
 })
 onReapply(applySeriesVisibility)
 onReapply(applyShellState)
+onReapply(applyLibrarySearch)
 
 // The same order on first load, and the shell last for the same reason
 // it is last above: initViewport() fits a sheet that has never been
@@ -65,3 +67,4 @@ applySelection()
 redrawEdges()
 applySeriesVisibility()
 initShell()
+applyLibrarySearch()
