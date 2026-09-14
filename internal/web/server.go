@@ -117,6 +117,7 @@ func New(studioService *studio.Studio) (*Server, error) {
 	mux.HandleFunc("DELETE /flows/{flowID}", server.deleteFlow)
 	mux.HandleFunc("POST /flows/{flowID}/blocks", server.addBlock)
 	mux.HandleFunc("PATCH /blocks/{blockID}/position", server.moveBlock)
+	mux.HandleFunc("POST /blocks/{blockID}/flip", server.flipBlock)
 	mux.HandleFunc("PATCH /flows/{flowID}/blocks/positions", server.moveBlocks)
 	mux.HandleFunc("PUT /blocks/{blockID}", server.updateBlock)
 	mux.HandleFunc("DELETE /blocks/{blockID}", server.deleteBlock)
@@ -834,4 +835,17 @@ func securityHeaders(next http.Handler) http.Handler {
 		}, "; "))
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) flipBlock(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "blockID")
+	if !ok {
+		return
+	}
+	snapshot, err := s.studio.FlipBlock(r.Context(), id)
+	if err != nil {
+		http.Error(w, studio.ValidationMessage(err), http.StatusBadRequest)
+		return
+	}
+	s.renderWorkbench(w, r, snapshot, id, "")
 }

@@ -19,6 +19,7 @@ function menuItems(node, point) {
     const plural = selectionSize() > 1 ? ` ${selectionSize()} blocks` : ''
     return [
       { label: 'Rename', run: () => editBlock(node) },
+      { label: 'Flip horizontally', run: () => htmx.ajax('POST', `/blocks/${node.dataset.blockId}/flip`, { target: '#workbench', swap: 'outerMorph' }) },
       { label: `Duplicate${plural}`, run: duplicateSelection },
       { label: 'Disconnect all wires', run: () => disconnectBlock(node) },
       { label: `Fit to${plural || ' this block'}`, run: fitSelection },

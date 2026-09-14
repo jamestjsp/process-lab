@@ -240,3 +240,20 @@ test('keeps multichannel target centers distinct', () => {
   assert.deepEqual(lower.at(-1), { x: target.left, y: 246 })
   assert.notEqual(routePath(upper), routePath(lower))
 })
+
+test('routes every horizontal port orientation outside the endpoint blocks', () => {
+  const source = block(400, 200)
+  const target = block(100, 400)
+  for (const sourceDirection of [-1, 1]) for (const targetDirection of [-1, 1]) {
+    const start = { x: sourceDirection > 0 ? source.right : source.left, y: 242, direction: sourceDirection }
+    const end = { x: targetDirection > 0 ? target.right : target.left, y: 442, direction: targetDirection }
+    const points = routeOrthogonal({ start, end, obstacles: [source, target], bounds: { left: 0, top: 0, right: 1000, bottom: 800 } })
+    assertOrthogonal(points)
+    for (const {a, b} of routeSegments(points)) {
+      assert.equal(segmentEntersRect(a, b, source), false)
+      assert.equal(segmentEntersRect(a, b, target), false)
+    }
+    assert.ok((points[1].x - start.x) * sourceDirection > 0)
+    assert.ok((points.at(-2).x - end.x) * targetDirection > 0)
+  }
+})

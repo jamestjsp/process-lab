@@ -260,7 +260,7 @@
             {{if or (not $.BoundedEdit) .Selected}}
             {{$block := .}}
             {{if and $.BoundedEdit .Selected}}<hx-partial hx-target="#block-card-{{.ID}}" hx-swap="outerMorph">{{end}}
-            <article id="block-card-{{.ID}}" class="block-card block-{{.Kind}}{{if .Selected}} selected{{end}}" data-block-id="{{.ID}}" style="left:{{.Position.X}}px;top:{{.Position.Y}}px">
+            <article id="block-card-{{.ID}}" class="block-card block-{{.Kind}}{{if .Selected}} selected{{end}}" data-block-id="{{.ID}}" data-mirrored="{{.Mirrored}}" style="left:{{.Position.X}}px;top:{{.Position.Y}}px">
               {{range .InputPorts}}
               <button type="button" class="port port-input" data-input-block="{{$block.ID}}" data-input-port="{{.Index}}" data-port-center="{{.Center}}" style="top:{{.Top}}px;--port-hit-height:{{.HitHeight}}px;--port-size:{{.Size}}px" aria-label="Connect to {{$block.Name}} {{.Name}}">{{if .Label}}<span class="port-label" aria-hidden="true">{{.Label}}</span>{{end}}</button>
               {{end}}

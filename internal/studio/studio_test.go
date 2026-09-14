@@ -523,3 +523,63 @@ func findBlockByName(t *testing.T, blocks []Block, name string) Block {
 	t.Fatalf("block %q not found", name)
 	return Block{}
 }
+
+func TestFlipBlockPersistsAndCopiesWithoutChangingConnections(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "flip.db")
+	service, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := service.Current(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := before.Blocks[0].ID
+	flipped, err := service.FlipBlock(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !flipped.Flow.ModelUpdatedAt.Equal(before.Flow.ModelUpdatedAt) {
+		t.Fatal("flip invalidated model results")
+	}
+	if !flipped.Blocks[0].Mirrored || !reflect.DeepEqual(before.Connections, flipped.Connections) {
+		t.Fatal("flip changed connectivity or did not mirror")
+	}
+	document, err := service.DumpFlow(ctx, before.Flow.ID)
+	if err != nil || !document.Blocks[0].Mirrored {
+		t.Fatalf("export orientation: %v", err)
+	}
+	if _, _, err := service.ApplyFlow(ctx, before.Flow.ID, document, false); err != nil {
+		t.Fatal(err)
+	}
+	flowCopy, err := service.DuplicateFlow(ctx, before.Flow.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !flowCopy.Snapshot.Blocks[0].Mirrored {
+		t.Fatal("flow copy lost orientation")
+	}
+	copied, err := service.DuplicateBlocks(ctx, before.Flow.ID, []int64{id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !copied.Blocks[len(copied.Blocks)-1].Mirrored {
+		t.Fatal("duplicate lost orientation")
+	}
+	if err := service.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened := openTestStudio(t, path)
+	saved, err := reopened.Snapshot(ctx, before.Flow.ID)
+	if err != nil || !saved.Blocks[0].Mirrored {
+		t.Fatalf("reload orientation: %v", err)
+	}
+	restored, err := reopened.FlipBlock(ctx, id)
+	if err != nil || restored.Blocks[0].Mirrored {
+		t.Fatalf("flip back: %v", err)
+	}
+	if _, err := reopened.FlipBlock(ctx, -1); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing block: %v", err)
+	}
+}

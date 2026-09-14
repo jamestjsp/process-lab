@@ -123,17 +123,20 @@ export function drawDraft(event) {
   if (!draft) return
   const source = connectionSource.node
   const { blockWidth } = geometry()
-  const startX = source.offsetLeft + blockWidth
+  const sourceDirection = source.dataset.mirrored === 'true' ? -1 : 1
+  const startX = source.offsetLeft + (sourceDirection > 0 ? blockWidth : 0)
   const startY = source.offsetTop + Number(connectionSource.button.dataset.portCenter)
   let { x: endX, y: endY } = screenToSheet(event.clientX, event.clientY)
   const targetPort = portUnderPointer(event)
+  let targetDirection = -1
   if (targetIsValid(targetPort)) {
     const target = targetPort.closest('.block-card')
-    endX = target.offsetLeft
+    targetDirection = target.dataset.mirrored === 'true' ? 1 : -1
+    endX = target.offsetLeft + (targetDirection > 0 ? blockWidth : 0)
     endY = target.offsetTop + Number(targetPort.dataset.portCenter)
   }
   draft.setAttribute('d', signalPath(
-    { x: startX, y: startY },
-    { x: endX, y: endY }
+    { x: startX, y: startY, direction: sourceDirection },
+    { x: endX, y: endY, direction: targetDirection }
   ))
 }

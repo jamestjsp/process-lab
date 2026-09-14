@@ -403,9 +403,9 @@ func (s *Studio) DuplicateBlocks(ctx context.Context, flowID int64, blockIDs []i
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `
-				INSERT INTO blocks(flow_id, kind, name, x, y, parameters_json)
-				VALUES(?, ?, ?, ?, ?, ?)`,
-				flowID, block.Kind, name, placed.X, placed.Y, encoded,
+				INSERT INTO blocks(flow_id, kind, name, x, y, parameters_json, mirrored)
+				VALUES(?, ?, ?, ?, ?, ?, ?)`,
+				flowID, block.Kind, name, placed.X, placed.Y, encoded, block.Mirrored,
 			); err != nil {
 				return fmt.Errorf("duplicate block: %w", err)
 			}
@@ -723,4 +723,24 @@ func ParseBlockKind(value string) (BlockKind, error) {
 		return "", invalid("unknown block type %q", value)
 	}
 	return kind, nil
+}
+
+// FlipBlock changes only the drawing orientation, preserving model results.
+func (s *Studio) FlipBlock(ctx context.Context, blockID int64) (Snapshot, error) {
+	var flowID int64
+	err := s.inTx(ctx, func(tx *sql.Tx) error {
+		block, err := blockByID(ctx, tx, blockID)
+		if err != nil {
+			return err
+		}
+		flowID = block.FlowID
+		if _, err := tx.ExecContext(ctx, "UPDATE blocks SET mirrored = NOT mirrored WHERE id = ?", blockID); err != nil {
+			return err
+		}
+		return s.touchLayout(ctx, tx, flowID)
+	})
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return s.snapshot(ctx, flowID)
 }

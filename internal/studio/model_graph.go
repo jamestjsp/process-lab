@@ -16,7 +16,7 @@ func loadModelGraph(
 	flowID int64,
 ) ([]Block, []Connection, error) {
 	rows, err := queryer.QueryContext(ctx, `
-		SELECT id, flow_id, kind, name, x, y, parameters_json
+		SELECT id, flow_id, kind, name, x, y, parameters_json, mirrored
 		FROM blocks WHERE flow_id = ? ORDER BY id`, flowID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("load blocks: %w", err)
@@ -27,7 +27,7 @@ func loadModelGraph(
 		var encoded string
 		if err := rows.Scan(
 			&block.ID, &block.FlowID, &block.Kind, &block.Name,
-			&block.Position.X, &block.Position.Y, &encoded,
+			&block.Position.X, &block.Position.Y, &encoded, &block.Mirrored,
 		); err != nil {
 			rows.Close()
 			return nil, nil, fmt.Errorf("scan block: %w", err)
