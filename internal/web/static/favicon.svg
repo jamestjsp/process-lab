@@ -1,9 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Process Lab">
-  <title>Process Lab</title>
-  <rect width="32" height="32" rx="6" fill="#101a18"/>
-  <g fill="#7aa8de">
-    <rect x="7" y="17" width="5" height="9" rx="1"/>
-    <rect x="13.5" y="7" width="5" height="19" rx="1"/>
-    <rect x="20" y="13" width="5" height="13" rx="1"/>
+  <title>Process Lab — connected signal blocks</title>
+  <rect width="32" height="32" rx="6" fill="#234f88"/>
+  <g fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="7" width="9" height="9" rx="1.5"/>
+    <path d="M6.5 13v-3h4M13 11.5h10.5"/>
+    <rect x="19" y="16" width="9" height="9" rx="1.5"/>
+    <path d="M23.5 11.5V16M21 21.5l1.5-3 2 4 1.5-2M19 20.5H8.5V16"/>
   </g>
 </svg>

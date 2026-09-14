@@ -202,6 +202,12 @@ available below the plot.
 
 ## Workbench interaction
 
+The **Theme** selector on the project register and workbench offers **Light**,
+**Dark**, and **System**. Neutral light is the default. The choice is saved in
+this browser and applied before the page is painted; System follows operating
+system appearance changes. Themes share semantic color tokens in `tokens.css`
+and do not change models, plots, or panel layout.
+
 On desktop, the window is a fixed application shell: the canvas is the only
 region that grows. At 860px and below, the interface stacks and the page
 scrolls so every control remains reachable without horizontal overflow. Both

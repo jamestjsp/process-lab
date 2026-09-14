@@ -37,6 +37,23 @@
   --fs-600: 24px;   /* hero figures */
 }
 
+:root[data-theme="light"] {
+  --cat-source: #285c91; --cat-source-deep: #285c91;
+  --cat-math: #67449c; --cat-math-deep: #67449c;
+  --cat-sum: #825800; --cat-sum-deep: #825800;
+  --cat-cont: #33629b; --cat-cont-deep: #33629b;
+  --cat-sink: #536174; --cat-sink-deep: #536174;
+  --alarm: #b3302b;
+}
+
+:root[data-theme="dark"] {
+  --cat-source: #91baff; --cat-source-deep: #91baff;
+  --cat-math: #c2a8fa; --cat-math-deep: #c2a8fa;
+  --cat-sum: #efbf62; --cat-sum-deep: #efbf62;
+  --cat-cont: #8fb9ed; --cat-cont-deep: #8fb9ed;
+  --cat-sink: #b5c1d1; --cat-sink-deep: #b5c1d1;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -64,7 +81,7 @@ input {
 .run-form input,
 .property-form input,
 .switcher-create input {
-  color-scheme: dark;
+  color-scheme: var(--control-scheme);
 }
 
 button {
@@ -109,7 +126,7 @@ kbd {
 .results-header,
 .tab-strip,
 .statusbar {
-  --focus: #5fd8c0;
+  --focus: var(--probe);
 }
 
 /* ---------------------------------------------------------------
@@ -152,7 +169,7 @@ kbd {
   min-height: 68px;
   padding: 0 18px;
   border-bottom: 1px solid var(--housing-deep);
-  background: linear-gradient(180deg, #1d2a27 0%, var(--housing) 100%);
+  background: var(--housing);
   box-shadow: inset 0 1px 0 var(--housing-glint);
   color: var(--ink-inverse);
 }
@@ -166,34 +183,10 @@ kbd {
 }
 
 .brand-mark {
+  display: block;
   width: 34px;
   height: 34px;
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  padding: 7px;
-  border: 1px solid var(--housing-line-strong);
-  border-radius: 6px;
-  background: var(--housing-deep);
-  box-shadow: inset 0 1px 0 var(--housing-glint);
-}
-
-.brand-mark i {
-  display: block;
-  flex: 1;
-  height: 52%;
-  border-radius: 1px;
-  background: var(--cat-cont);
-}
-
-.brand-mark i:nth-child(2) {
-  height: 96%;
-  background: var(--probe);
-}
-
-.brand-mark i:nth-child(3) {
-  height: 70%;
-  background: var(--caution);
+  flex: 0 0 34px;
 }
 
 .brand strong,
@@ -745,6 +738,13 @@ kbd {
   color: var(--ink-inverse-muted);
   font-size: var(--fs-200);
   line-height: 1.5;
+}
+
+.panel-heading {
+  padding: 6px var(--rail-pad) 0;
+}
+
+/* --------------------------------- Palette --------------------- */
 .palette-search {
   display: grid;
   gap: 5px;
@@ -779,13 +779,6 @@ kbd {
   display: none;
 }
 
-}
-
-.panel-heading {
-  padding: 6px var(--rail-pad) 0;
-}
-
-/* --------------------------------- Palette --------------------- */
 .palette-list {
   display: grid;
   align-content: start;
@@ -817,7 +810,7 @@ kbd {
 .palette-item:hover {
   border-color: var(--probe);
   transform: translateY(-1px);
-  background: #26332f;
+  background: var(--housing-raised);
 }
 
 .palette-item:hover .add-glyph {
@@ -965,7 +958,7 @@ kbd {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid #0a100f;
+  border: 1px solid var(--housing-line-strong);
   border-radius: var(--radius);
   background: var(--sheet);
   box-shadow: 0 0 0 1px rgb(255 255 255 / 5%), 0 10px 26px rgb(0 0 0 / 34%);
@@ -1001,7 +994,7 @@ kbd {
 }
 
 .dock-resizer:focus-visible {
-  outline: 2px solid #5fd8c0;
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
   border-radius: 4px;
 }
@@ -1025,7 +1018,7 @@ body.is-resizing-dock .studio-grid {
   gap: 12px;
   padding: 0 12px;
   border-bottom: 1px solid var(--sheet-line);
-  background: linear-gradient(180deg, #fff 0%, #e9eeec 100%);
+  background: var(--sheet-card);
   color: var(--ink-muted);
   font-size: var(--fs-200);
 }
@@ -1139,10 +1132,10 @@ body.is-resizing-dock .studio-grid {
   overflow: hidden;
   background-color: var(--sheet);
   background-image:
-    linear-gradient(rgb(16 45 40 / 12%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(16 45 40 / 12%) 1px, transparent 1px),
-    linear-gradient(rgb(16 45 40 / 5%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(16 45 40 / 5%) 1px, transparent 1px);
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
   background-size:
     var(--grid-coarse, 80px) var(--grid-coarse, 80px),
     var(--grid-coarse, 80px) var(--grid-coarse, 80px),
@@ -1157,8 +1150,8 @@ body.is-resizing-dock .studio-grid {
    the coarse one, the way a drafting sheet coarsens as you pull back. */
 .flow-canvas[data-zoom-band="coarse"] {
   background-image:
-    linear-gradient(rgb(16 45 40 / 15%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(16 45 40 / 15%) 1px, transparent 1px);
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
   background-size: var(--grid-coarse, 80px) var(--grid-coarse, 80px);
 }
 
@@ -1446,7 +1439,7 @@ body.is-resizing-dock .studio-grid {
   border: 1px solid var(--sheet-line);
   border-radius: var(--radius-sm);
   color: var(--ink-muted);
-  background: rgb(255 255 255 / 92%);
+  background: var(--sheet-card);
   font-size: var(--fs-100);
   pointer-events: none;
 }
@@ -1657,7 +1650,7 @@ body.is-resizing-dock .studio-grid {
   padding: 0 14px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  color: #08110f;
+  color: var(--button-ink);
   background: var(--probe);
   cursor: pointer;
   font-size: var(--fs-200);
@@ -1668,7 +1661,7 @@ body.is-resizing-dock .studio-grid {
 
 .run-button:hover,
 .save-button:hover {
-  background: #4ac6ae;
+  background: var(--probe-hover);
 }
 
 .run-button:disabled {
@@ -1903,7 +1896,7 @@ body.is-resizing-dock .studio-grid {
 }
 
 .chart-grid {
-  stroke: #d7dfdc;
+  stroke: var(--sheet-line);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
@@ -1916,7 +1909,7 @@ body.is-resizing-dock .studio-grid {
    default 1440px layout, so 14 units lands above the 11px floor. */
 .chart-label,
 .axis-title {
-  fill: #43534e;
+  fill: var(--ink-muted);
   font-size: 14px;
 }
 
@@ -2104,7 +2097,7 @@ body.is-resizing-dock .studio-grid {
   border: 1px solid var(--sheet-line);
   border-radius: var(--radius-sm);
   color: var(--ink);
-  background: #fff;
+  background: var(--sheet-card);
   font-family: var(--font-mono);
   font-size: var(--fs-100);
 }
@@ -2196,7 +2189,7 @@ body.is-resizing-dock .studio-grid {
   border: 1px dashed var(--sheet-line);
   border-radius: var(--radius);
   color: var(--ink-muted);
-  background: rgb(255 255 255 / 45%);
+  background: var(--sheet-card);
 }
 
 .analysis-empty strong {
@@ -2238,7 +2231,7 @@ body.is-resizing-dock .studio-grid {
   gap: 12px;
   padding: 10px 11px;
   border-bottom: 1px solid var(--sheet-line-soft);
-  background: rgb(245 248 247 / 92%);
+  background: var(--sheet-card);
 }
 
 .analysis-kind {
@@ -2338,7 +2331,7 @@ body.is-resizing-dock .studio-grid {
   overflow-x: auto;
   border: 1px solid var(--sheet-line-soft);
   border-radius: var(--radius-sm);
-  background: #fbfcfc;
+  background: var(--sheet-card);
 }
 
 .analysis-plot figcaption {
@@ -2462,7 +2455,7 @@ body.is-resizing-dock .studio-grid {
 }
 
 .chart-cursor-line {
-  stroke: #152b27;
+  stroke: var(--ink);
   stroke-width: 1;
   stroke-dasharray: 2 2;
   vector-effect: non-scaling-stroke;
@@ -2470,7 +2463,7 @@ body.is-resizing-dock .studio-grid {
 
 .chart-cursor-point {
   fill: var(--sheet-card);
-  stroke: #152b27;
+  stroke: var(--ink);
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
 }
@@ -2589,7 +2582,7 @@ body.is-resizing-dock .studio-grid {
 }
 
 .analysis-axis {
-  stroke: #cfd8d5;
+  stroke: var(--sheet-line);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
@@ -2783,7 +2776,7 @@ body.is-resizing-dock .studio-grid {
 }
 
 .property-form input::placeholder {
-  color: #6d827c;
+  color: var(--ink-inverse-muted);
 }
 
 .property-form input:focus-visible,
@@ -3245,7 +3238,7 @@ body.is-resizing-dock .studio-grid {
   background: var(--housing);
   box-shadow: inset 0 0 0 1px var(--probe);
   caret-color: var(--probe);
-  color-scheme: dark;
+  color-scheme: var(--control-scheme);
   font-size: var(--fs-200);
   font-weight: 550;
   letter-spacing: .005em;
