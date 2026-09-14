@@ -5,7 +5,7 @@ import vm from 'node:vm'
 
 const source = readFileSync(new URL('./chart-export.js', import.meta.url), 'utf8').replace('export async function', 'async function')
 
-test('PNG export uses chart proportions and an image source allowed by the app policy', async () => {
+test('PNG export is Full HD, preserves chart proportions, and uses an allowed image source', async () => {
   const copy = { style: { setProperty() {} }, setAttribute() {}, querySelectorAll: () => [] }
   const svg = {
     cloneNode: () => copy, querySelectorAll: () => [],
@@ -28,9 +28,11 @@ test('PNG export uses chart proportions and an image source allowed by the app p
   vm.runInNewContext(source, sandbox)
   const root = { querySelector: selector => selector === '[data-chart-readout]' ? readout : { textContent: 'Temperature' } }
   await sandbox.saveChartPNG(root, svg)
-  assert.equal(canvas.width, 2000)
-  assert.equal(canvas.height, Math.round(2000 * 258 / 780) + 94)
-  assert.equal(context.draw[2], 70)
+  assert.equal(canvas.width, 1920)
+  assert.equal(canvas.height, 1080)
+  assert.equal(context.draw[3], 1840)
+  assert.equal(context.draw[4], Math.round(1840 * 258 / 780))
+  assert.ok(context.draw[2] >= 70)
   assert.equal(link.download, 'Temperature.png')
   assert.equal(clicked, true)
   assert.match(readout.textContent, /PNG prepared/)
