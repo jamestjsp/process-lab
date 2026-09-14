@@ -14,6 +14,7 @@ type FlowDocument struct {
 }
 
 type DocumentBlock struct {
+	Mirrored   bool              `json:"mirrored,omitempty"`
 	ID         int64             `json:"id,omitempty"`
 	Kind       BlockKind         `json:"kind"`
 	Name       string            `json:"name"`
@@ -76,7 +77,7 @@ func (s *Studio) DumpFlow(ctx context.Context, flowID int64) (FlowDocument, erro
 		}
 		document.Blocks = append(document.Blocks, DocumentBlock{
 			ID: block.ID, Kind: block.Kind, Name: block.Name,
-			Position: DocumentPosition{X: block.Position.X, Y: block.Position.Y}, Parameters: parameters,
+			Position: DocumentPosition{X: block.Position.X, Y: block.Position.Y}, Mirrored: block.Mirrored, Parameters: parameters,
 		})
 	}
 	names := make(map[int64]string, len(snapshot.Blocks))
@@ -158,6 +159,7 @@ func prepareDocument(snapshot Snapshot, document FlowDocument) ([]documentBlockS
 			DocumentBlock: desired,
 			Block:         validated,
 		}
+		state.Block.Mirrored = desired.Mirrored
 		state.Block.Position = Point{X: desired.Position.X, Y: desired.Position.Y}
 		states = append(states, state)
 		byName[desired.Name] = state
@@ -250,7 +252,7 @@ func planDocument(snapshot Snapshot, states []documentBlockState, byName map[str
 			continue
 		}
 		blockChanged := previous.Kind != state.Block.Kind || previous.Name != state.Block.Name || !blockParametersEqual(previous, state.Block)
-		positionChanged := previous.Position != state.Block.Position
+		positionChanged := previous.Position != state.Block.Position || previous.Mirrored != state.Block.Mirrored
 		if blockChanged || positionChanged {
 			result.Updated = append(result.Updated, state.Name)
 		}
@@ -333,9 +335,9 @@ func (s *Studio) applyDocumentTx(ctx context.Context, tx *sql.Tx, flowID int64, 
 				return err
 			}
 			insertResult, err := tx.ExecContext(ctx, `
-				INSERT INTO blocks(flow_id, kind, name, x, y, parameters_json)
-				VALUES(?, ?, ?, ?, ?, ?)`,
-				flowID, state.Block.Kind, state.Block.Name, state.Block.Position.X, state.Block.Position.Y, encoded,
+				INSERT INTO blocks(flow_id, kind, name, x, y, parameters_json, mirrored)
+				VALUES(?, ?, ?, ?, ?, ?, ?)`,
+				flowID, state.Block.Kind, state.Block.Name, state.Block.Position.X, state.Block.Position.Y, encoded, state.Block.Mirrored,
 			)
 			if err != nil {
 				return fmt.Errorf("add document block: %w", err)
@@ -356,9 +358,9 @@ func (s *Studio) applyDocumentTx(ctx context.Context, tx *sql.Tx, flowID int64, 
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `
-			UPDATE blocks SET x = ?, y = ?, parameters_json = ?
+			UPDATE blocks SET x = ?, y = ?, parameters_json = ?, mirrored = ?
 			WHERE id = ? AND flow_id = ?`,
-			state.Block.Position.X, state.Block.Position.Y, encoded, previous.ID, flowID,
+			state.Block.Position.X, state.Block.Position.Y, encoded, state.Block.Mirrored, previous.ID, flowID,
 		); err != nil {
 			return fmt.Errorf("update document block: %w", err)
 		}

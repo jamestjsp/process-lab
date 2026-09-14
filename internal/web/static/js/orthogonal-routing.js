@@ -619,10 +619,10 @@ function chooseCandidate(
 }
 
 function fallbackRoute(start, end, obstacles, bounds, options) {
-  const sourceOwner = endpointOwner(start, obstacles, true)
-  const targetOwner = endpointOwner(end, obstacles, false)
-  const sourceExit = stubEnd(start, 1, options.portStub, obstacles, sourceOwner)
-  const targetEntry = stubEnd(end, -1, options.portStub, obstacles, targetOwner)
+  const sourceOwner = endpointOwner(start, obstacles, options.sourceDirection > 0)
+  const targetOwner = endpointOwner(end, obstacles, options.targetDirection > 0)
+  const sourceExit = stubEnd(start, options.sourceDirection, options.portStub, obstacles, sourceOwner)
+  const targetEntry = stubEnd(end, options.targetDirection, options.portStub, obstacles, targetOwner)
   return chooseCandidate(
     start,
     end,
@@ -647,12 +647,12 @@ function routeWithClearance(
   obstacleIndex
 ) {
   const expanded = obstacles.map((rect) => inflateRect(rect, clearance))
-  const sourceOwner = endpointOwner(source, obstacles, true)
-  const targetOwner = endpointOwner(target, obstacles, false)
-  const sourceExit = stubEnd(source, 1, options.portStub, expanded, sourceOwner)
-  const targetEntry = stubEnd(target, -1, options.portStub, expanded, targetOwner)
-  if (sourceOwner >= 0 && sourceExit.x - source.x < clearance - EPSILON) return null
-  if (targetOwner >= 0 && target.x - targetEntry.x < clearance - EPSILON) return null
+  const sourceOwner = endpointOwner(source, obstacles, options.sourceDirection > 0)
+  const targetOwner = endpointOwner(target, obstacles, options.targetDirection > 0)
+  const sourceExit = stubEnd(source, options.sourceDirection, options.portStub, expanded, sourceOwner)
+  const targetEntry = stubEnd(target, options.targetDirection, options.portStub, expanded, targetOwner)
+  if (sourceOwner >= 0 && (sourceExit.x - source.x) * options.sourceDirection < clearance - EPSILON) return null
+  if (targetOwner >= 0 && (targetEntry.x - target.x) * options.targetDirection < clearance - EPSILON) return null
   const isClear = obstacleIndex
     ? (a, b) => obstacleIndex.querySegment(a, b, clearance)
         .every((rect) => !segmentCrossesRect(a, b, inflateRect(rect, clearance)))
@@ -688,6 +688,8 @@ export function routeOrthogonal({
   const target = { x: Number(end.x), y: Number(end.y) }
   const normalized = obstacleIndex?.obstacles || obstacles.map(normalizeRect)
   const options = {
+    sourceDirection: start.direction === -1 ? -1 : 1,
+    targetDirection: end.direction === 1 ? 1 : -1,
     portStub,
     bendPenalty,
     crossingPenalty,

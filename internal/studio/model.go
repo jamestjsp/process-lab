@@ -176,6 +176,7 @@ type Block struct {
 	Kind                BlockKind
 	Name                string
 	Position            Point
+	Mirrored            bool
 	Parameters          Parameters
 	resolvedSignalWidth int
 }

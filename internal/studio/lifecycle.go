@@ -285,9 +285,10 @@ func copyBlocks(ctx context.Context, tx *sql.Tx, sourceFlowID, targetFlowID int6
 		id                     int64
 		kind, name, parameters string
 		x, y                   int
+		mirrored               bool
 	}
 	rows, err := tx.QueryContext(ctx, `
-		SELECT id, kind, name, x, y, parameters_json
+		SELECT id, kind, name, x, y, parameters_json, mirrored
 		FROM blocks WHERE flow_id = ? ORDER BY id`, sourceFlowID)
 	if err != nil {
 		return nil, fmt.Errorf("load blocks to copy: %w", err)
@@ -298,7 +299,7 @@ func copyBlocks(ctx context.Context, tx *sql.Tx, sourceFlowID, targetFlowID int6
 	for rows.Next() {
 		var block row
 		if err := rows.Scan(
-			&block.id, &block.kind, &block.name, &block.x, &block.y, &block.parameters,
+			&block.id, &block.kind, &block.name, &block.x, &block.y, &block.parameters, &block.mirrored,
 		); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("scan block to copy: %w", err)
@@ -312,9 +313,9 @@ func copyBlocks(ctx context.Context, tx *sql.Tx, sourceFlowID, targetFlowID int6
 	moved := make(map[int64]int64, len(source))
 	for _, block := range source {
 		result, err := tx.ExecContext(ctx, `
-			INSERT INTO blocks(flow_id, kind, name, x, y, parameters_json)
-			VALUES(?, ?, ?, ?, ?, ?)`,
-			targetFlowID, block.kind, block.name, block.x, block.y, block.parameters,
+			INSERT INTO blocks(flow_id, kind, name, x, y, parameters_json, mirrored)
+			VALUES(?, ?, ?, ?, ?, ?, ?)`,
+			targetFlowID, block.kind, block.name, block.x, block.y, block.parameters, block.mirrored,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("copy block %q: %w", block.name, err)

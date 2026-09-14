@@ -362,3 +362,25 @@ test("zoom recreates clipping after a real workbench morph", async () => {
     assert.deepEqual(problems, []);
   } finally { await page.close(); }
 });
+
+test("context-menu flip swaps ports and survives reload without reflecting labels", async () => {
+  const {page, problems} = await openWorkbench();
+  try {
+    const card = page.locator('.block-card').filter({has: page.locator('.port-input')}).filter({has: page.locator('.port-output')}).first();
+    const id = await card.getAttribute('data-block-id');
+    await card.click({button:'right'});
+    await page.getByRole('menuitem', {name:'Flip horizontally',exact:true}).click();
+    await page.waitForSelector(`#block-card-${id}[data-mirrored="true"]`);
+    await page.reload();
+    const saved = page.locator(`#block-card-${id}`);
+    assert.equal(await saved.getAttribute('data-mirrored'), 'true');
+    const input = await saved.locator('.port-input').first().boundingBox();
+    const output = await saved.locator('.port-output').first().boundingBox();
+    assert.ok(input.x > output.x);
+    assert.equal(await saved.evaluate(node => getComputedStyle(node).transform), 'none');
+    await saved.click({button:'right'});
+    await page.getByRole('menuitem', {name:'Flip horizontally',exact:true}).click();
+    await page.waitForSelector(`#block-card-${id}[data-mirrored="false"]`);
+    assert.deepEqual(problems, []);
+  } finally { await page.close(); }
+});

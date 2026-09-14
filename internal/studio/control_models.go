@@ -1035,7 +1035,7 @@ func loadControlRoleGraph(
 		return nil, nil, err
 	}
 	rows, err := tx.QueryContext(ctx, `
-		SELECT id, flow_id, kind, name, x, y, parameters_json
+		SELECT id, flow_id, kind, name, x, y, parameters_json, mirrored
 		FROM blocks WHERE flow_id = ? ORDER BY id`, flowID)
 	if err != nil {
 		return nil, nil, err
@@ -1046,7 +1046,7 @@ func loadControlRoleGraph(
 		var encoded string
 		if err := rows.Scan(
 			&block.ID, &block.FlowID, &block.Kind, &block.Name,
-			&block.Position.X, &block.Position.Y, &encoded,
+			&block.Position.X, &block.Position.Y, &encoded, &block.Mirrored,
 		); err != nil {
 			rows.Close()
 			return nil, nil, err

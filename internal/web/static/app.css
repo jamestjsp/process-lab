@@ -4008,3 +4008,7 @@ body.is-resizing-dock .studio-grid {
 /* SVG does not receive the HTML hidden-element rendering rule. */
 [data-chart-characteristic][hidden],
 [data-chart-cursor][hidden] { display: none; }
+
+.block-card[data-mirrored="true"] .port-input { left: auto; right: calc(-3px - var(--port-size, 14px) / 2); }
+.block-card[data-mirrored="true"] .port-output { right: auto; left: calc(-3px - var(--port-size, 14px) / 2); }
+.block-card[data-mirrored="true"] .port-input .port-label { left: auto; right: calc(var(--port-size, 14px) + 3px); }

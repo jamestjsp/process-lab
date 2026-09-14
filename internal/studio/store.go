@@ -169,6 +169,17 @@ func Open(ctx context.Context, path string) (*Studio, error) {
 		return nil, err
 	}
 
+	if err := inDBTx(ctx, db, func(tx *sql.Tx) error {
+		found, err := tableHasColumn(ctx, tx, "blocks", "mirrored")
+		if err != nil || found {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, "ALTER TABLE blocks ADD COLUMN mirrored INTEGER NOT NULL DEFAULT 0")
+		return err
+	}); err != nil {
+		db.Close()
+		return nil, err
+	}
 	studio := &Studio{db: db, now: time.Now}
 	if err := studio.seed(ctx); err != nil {
 		db.Close()
@@ -857,11 +868,11 @@ func blockByID(ctx context.Context, tx *sql.Tx, id int64) (Block, error) {
 	var block Block
 	var encoded string
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, flow_id, kind, name, x, y, parameters_json
+		SELECT id, flow_id, kind, name, x, y, parameters_json, mirrored
 		FROM blocks WHERE id = ?`, id,
 	).Scan(
 		&block.ID, &block.FlowID, &block.Kind, &block.Name,
-		&block.Position.X, &block.Position.Y, &encoded,
+		&block.Position.X, &block.Position.Y, &encoded, &block.Mirrored,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Block{}, ErrNotFound

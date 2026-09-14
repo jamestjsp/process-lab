@@ -48,7 +48,7 @@ function routingContext(root) {
     }
     blocksByID.set(blockID, block)
     obstaclesByBlock.set(blockID, obstacle)
-    return { blockID, obstacle }
+    return { blockID, obstacle, mirrored: block.dataset.mirrored }
   })
   blockRecords.sort((a, b) => a.blockID.localeCompare(b.blockID, undefined, { numeric: true }))
   const edgeElementsByID = new Map()
@@ -74,7 +74,8 @@ function routingContext(root) {
       height,
       blockWidth,
       blockHeight,
-      ...blockRecords.flatMap(({ blockID, obstacle }) => [
+      ...blockRecords.flatMap(({ blockID, obstacle, mirrored }) => [
+        mirrored,
         blockID,
         obstacle.left,
         obstacle.top,
@@ -90,7 +91,8 @@ function endpoint(block, center, output, context) {
   const left = Number.parseFloat(block.style.left) || 0
   const top = Number.parseFloat(block.style.top) || 0
   return {
-    x: left + (output ? context.blockWidth : 0),
+    x: left + ((output !== (block.dataset.mirrored === 'true')) ? context.blockWidth : 0),
+    direction: (output !== (block.dataset.mirrored === 'true')) ? 1 : -1,
     y: top + offset
   }
 }
