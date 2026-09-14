@@ -144,6 +144,12 @@ function toggleRail(side) {
   applyShellState()
 }
 
+export function showInspector() {
+  railOverride.right = true
+  writeShell(SHELL_KEYS.right, 'expanded')
+  applyShellState()
+}
+
 function setDockHeight(requested, persist = true) {
   const resolved = resolveDockHeight(requested)
   applyDockState(resolved.height, resolved.collapsed, resolved.limits)

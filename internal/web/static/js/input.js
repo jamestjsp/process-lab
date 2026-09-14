@@ -19,7 +19,7 @@ import {
 } from './viewport.js'
 import {
   beginMarquee, deleteSelection, duplicateSelection, endMarquee, fitSelection,
-  moveMarquee, selectAll, selectBlock, selectionSize, setSelection
+  moveMarquee, selectAll, selectBlock, selectionSize, setSelection, editBlock
 } from './selection.js'
 import { endDrag, moveDrag, nudgeSelection, startDrag } from './dragging.js'
 import {
@@ -33,6 +33,13 @@ function typingInAField(event) {
   const node = event.target
   return node instanceof HTMLElement && node.closest('input, textarea, select, [contenteditable="true"]')
 }
+
+document.addEventListener('dblclick', (event) => {
+  // Pointer capture for dragging retargets the double-click to the card.
+  if (event.target.closest('.port')) return
+  const node = event.target.closest('#flow-canvas .block-card')
+  if (node) editBlock(node)
+})
 
 // Something nearer the keyboard than a global shortcut has the key: a
 // text field the user is typing into, or an open context menu.

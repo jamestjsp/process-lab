@@ -11,14 +11,14 @@ import { geometry } from './geometry.js'
 import { fitView, resetZoom, screenToSheet } from './viewport.js'
 import {
   deleteSelection, duplicateSelection, fitSelection, isSelected,
-  selectAll, selectBlock, selectionSize, setSelection
+  selectAll, editBlock, selectionSize, setSelection
 } from './selection.js'
 
 function menuItems(node, point) {
   if (node) {
     const plural = selectionSize() > 1 ? ` ${selectionSize()} blocks` : ''
     return [
-      { label: 'Rename', run: () => focusInspectorName(node) },
+      { label: 'Rename', run: () => editBlock(node) },
       { label: `Duplicate${plural}`, run: duplicateSelection },
       { label: 'Disconnect all wires', run: () => disconnectBlock(node) },
       { label: `Fit to${plural || ' this block'}`, run: fitSelection },
@@ -57,20 +57,6 @@ function paletteChoices(point) {
       }
     }
   })
-}
-
-function focusInspectorName(node) {
-  selectBlock(node)
-  // The inspector arrives with the swap, so wait for it before focusing.
-  const focusWhenReady = () => {
-    const field = document.querySelector('.property-form input[name="name"]')
-    if (field) {
-      field.focus()
-      field.select()
-    }
-    document.removeEventListener('htmx:after:swap', focusWhenReady)
-  }
-  document.addEventListener('htmx:after:swap', focusWhenReady)
 }
 
 function disconnectBlock(node) {

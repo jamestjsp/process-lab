@@ -14,6 +14,7 @@
 import { canvas, setStatus, sheet, workbench } from './dom.js'
 import { geometry } from './geometry.js'
 import { currentZoom, fitTo, screenToSheet } from './viewport.js'
+import { showInspector } from './shell.js'
 
 const selection = new Set()
 let marquee = null
@@ -161,10 +162,21 @@ export function selectBlock(node) {
   const root = workbench()
   if (!root || !node) return
   setSelection([node.dataset.blockId])
-  htmx.ajax('GET', `/flows/${root.dataset.flowId}/workbench?selected=${node.dataset.blockId}`, {
+  return htmx.ajax('GET', `/flows/${root.dataset.flowId}/workbench?selected=${node.dataset.blockId}`, {
     target: '#workbench',
     swap: 'outerMorph'
   })
+}
+
+export async function editBlock(node) {
+  if (!node) return
+  const id = node.dataset.blockId
+  showInspector()
+  await selectBlock(node)
+  if (workbench()?.dataset.selectedId !== id) return
+  const field = document.querySelector('.property-form input[name="name"]')
+  field?.focus()
+  field?.select()
 }
 
 // ---- marquee --------------------------------------------------------

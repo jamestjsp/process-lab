@@ -19,6 +19,7 @@ const SHORTCUTS = [
     ['Shift + 1', 'Fit the flowsheet to the window']
   ]],
   ['Blocks', [
+    ['Double-click a block', 'Open its inspector and edit its name or parameters'],
     ['Drag a block', 'Move it; it snaps to the grid'],
     ['Alt + drag', 'Suspend alignment magnetism'],
     ['Shift or Cmd + click', 'Add or remove one block'],

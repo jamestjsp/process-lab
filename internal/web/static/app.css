@@ -745,6 +745,40 @@ kbd {
   color: var(--ink-inverse-muted);
   font-size: var(--fs-200);
   line-height: 1.5;
+.palette-search {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.palette-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--housing-line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink-inverse);
+  background: var(--housing-deep);
+  color-scheme: var(--control-scheme);
+  font: inherit;
+}
+
+.palette-search input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-color: var(--probe);
+}
+
+#block-search-status {
+  display: block;
+  margin-top: 5px;
+}
+
+.palette-list form[hidden] {
+  display: none;
+}
+
 }
 
 .panel-heading {

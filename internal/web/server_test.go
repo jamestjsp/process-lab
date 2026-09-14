@@ -258,6 +258,27 @@ func TestWorkbenchRendersValidatedParameterShapes(t *testing.T) {
 	}
 }
 
+func TestSimulationEmptyStateDistinguishesEditedModel(t *testing.T) {
+	server, _ := openTestServer(t)
+	for _, priorRun := range []bool{false, true} {
+		view := newWorkbenchView(studio.Workspace{Snapshot: studio.Snapshot{Flow: studio.Flow{ID: 1}}}, 0, "")
+		if priorRun {
+			view.RecentRuns = []simulationRunView{{}}
+		}
+		var page strings.Builder
+		if err := server.templates.ExecuteTemplate(&page, "workbench", view); err != nil {
+			t.Fatal(err)
+		}
+		body := page.String()
+		if strings.Contains(body, "Model changed — run again") != priorRun || strings.Contains(body, "No run yet") == priorRun {
+			t.Fatalf("incorrect empty state with priorRun=%v", priorRun)
+		}
+		if !strings.Contains(body, `id="block-search"`) || !strings.Contains(body, `aria-controls="block-catalogue"`) {
+			t.Fatal("block search must reference its catalogue")
+		}
+	}
+}
+
 func TestWorkbenchRendersNamedVectorPortWidth(t *testing.T) {
 	server, _ := openTestServer(t)
 	workspace := studio.Workspace{
