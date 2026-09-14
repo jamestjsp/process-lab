@@ -12,6 +12,7 @@ class FakeElement {
     this.listeners = new Map()
     this.style = {}
     this.isConnected = true
+    this.classList = { contains: (name) => (this.getAttribute('class') || '').split(' ').includes(name) }
     this.ownerDocument = fakeDocument
   }
 
@@ -33,6 +34,9 @@ class FakeElement {
   }
 
   matches(selector) {
+    if (selector.includes(',')) return selector.split(',').some((part) => this.matches(part.trim()))
+    if (selector.startsWith('.')) return (this.getAttribute('class') || '').split(' ').includes(selector.slice(1))
+    if (selector === 'path') return this.tagName === 'PATH'
     if (selector === '*') return true
     if (selector === 'svg') return this.tagName === 'SVG'
     const attribute = selector.match(/^\[([^\]]+)\]$/)?.[1]
@@ -137,7 +141,7 @@ const {
   parsePathVertices,
   scaleValue,
   seriesValuesAtX,
-  zoomedViewBox
+  zoomedPlotConfig
 } = await import('./charts.js')
 
 test('normalizes trend layouts to the server-rendered overlay fallback', () => {
@@ -191,6 +195,10 @@ function engineeringPlot({ group, paths, readoutText = 'Move over the plot for e
   const zoomIn = new FakeElement('button', { dataset: { chartZoomIn: '' } })
   const zoomOut = new FakeElement('button', { dataset: { chartZoomOut: '' } })
   const reset = new FakeElement('button', { dataset: { chartReset: '' } })
+  // Toolbar icons precede the actual plot and must never become its SVG target.
+  for (const button of [characteristics, clear, zoomIn, zoomOut, reset]) {
+    button.append(new FakeElement('svg', { attributes: { 'aria-hidden': 'true', viewBox: '0 0 24 24' } }))
+  }
   controls.append(characteristics, clear, zoomIn, zoomOut, reset)
   const readout = new FakeElement('output', {
     dataset: { chartReadout: '' },
@@ -270,20 +278,6 @@ test('maps keyboard commands to bounded vertex navigation', () => {
   assert.equal(inspectionIndexForKey('End', 1, 4), 3)
   assert.equal(inspectionIndexForKey('Enter', 1, 4), undefined)
   assert.equal(inspectionIndexForKey('End', 0, 0), null)
-})
-
-test('computes an anchored chart view box within bounded zoom limits', () => {
-  const base = { x: 0, y: 0, width: 400, height: 200 }
-  assert.deepEqual(zoomedViewBox(base, 2, { x: 100, y: 50 }), {
-    x: 50,
-    y: 25,
-    width: 200,
-    height: 100,
-    zoom: 2
-  })
-  assert.equal(zoomedViewBox(base, 100).zoom, 4)
-  assert.equal(zoomedViewBox(base, 0.1).zoom, 1)
-  assert.equal(zoomedViewBox({ ...base, width: 0 }, 2), null)
 })
 
 test('excludes hidden series from values at the selected domain position', () => {
@@ -391,7 +385,8 @@ test('characteristic, clear, zoom, and reset controls remain functional after re
   }
   assert.equal(plot.root.dataset.chartZoom, '4')
   assert.equal(plot.controls.zoomIn.disabled, true)
-  assert.notEqual(plot.svg.getAttribute('viewBox'), '0 0 120 100')
+  assert.equal(plot.svg.getAttribute('viewBox'), '0 0 120 100')
+  assert.equal(Number(plot.root.dataset.xMax) - Number(plot.root.dataset.xMin), 2.5)
   assert.match(plot.controls.zoomOut.getAttribute('aria-label'), /400%/)
 
   plot.root.emit('pointermove', { plotX: 60, plotY: 50 })
@@ -400,4 +395,139 @@ test('characteristic, clear, zoom, and reset controls remain functional after re
   assert.equal(plot.svg.getAttribute('viewBox'), '0 0 120 100')
   assert.equal(cursor.hasAttribute('hidden'), true)
   assert.equal(plot.controls.zoomOut.disabled, true)
+})
+
+
+test('zoom narrows logarithmic decades and preserves an anchor in the current data window', () => {
+  const base = { xMin: 0.1, xMax: 1000, yMin: -100, yMax: 100, xScale: 'log10', yScale: 'linear' }
+  const zoomed = zoomedPlotConfig(base, base, 2)
+  assert.ok(Math.abs(zoomed.xMin - 1) < 1e-12)
+  assert.ok(Math.abs(zoomed.xMax - 100) < 1e-12)
+  assert.equal(zoomed.yMin, -50)
+  assert.equal(zoomed.yMax, 50)
+  const anchored = zoomedPlotConfig(base, zoomed, 4, { x: 1, y: -50 })
+  assert.equal(anchored.xMin, 1)
+  assert.equal(anchored.xMax, 10)
+  assert.equal(anchored.yMin, -50)
+  assert.equal(anchored.yMax, 0)
+  assert.deepEqual(zoomedPlotConfig(base, anchored, 1), base)
+})
+
+test('zoom redraws ticks and paths inside a fixed frame and reset restores exact source geometry', () => {
+  const path = seriesPath('response', 'Response', 'M 10 90 L 60 50 M 80 34 L 110 10')
+  const plot = engineeringPlot({ group: `range-${plotSequence}`, paths: [path] })
+  const xTick = new FakeElement('text', { attributes: { class: 'chart-label x-label', x: '10', y: '95' }, textContent: '0' })
+  const yTick = new FakeElement('text', { attributes: { class: 'chart-label y-label', x: '5', y: '10' }, textContent: '100' })
+  plot.svg.append(xTick, yTick)
+  applyChartInspection(plot.root)
+  plot.root.emit('click', { target: plot.controls.zoomIn })
+  assert.equal(plot.svg.getAttribute('viewBox'), '0 0 120 100')
+  assert.equal(xTick.getAttribute('x'), '10')
+  assert.equal(yTick.getAttribute('y'), '10')
+  assert.equal(xTick.textContent, '1')
+  assert.equal(yTick.textContent, '90')
+  assert.match(path.getAttribute('clip-path'), /^url\(#chart-data-clip-/)
+  assert.equal((path.getAttribute('d').match(/M/g) || []).length, 2)
+  assert.notEqual(path.getAttribute('d'), 'M 10 90 L 60 50 M 80 34 L 110 10')
+  plot.root.emit('pointermove', { plotX: 60, plotY: 50 })
+  assert.equal(plot.readout.textContent, 'x 5; Response 50')
+  plot.root.emit('keydown', { key: 'Home', preventDefault() {} })
+  assert.equal(plot.readout.textContent, 'x 5; Response 50')
+  // A visibility/layout refresh must retain the current range and base geometry.
+  applyChartInspection(plot.root)
+  plot.root.emit('click', { target: plot.controls.reset })
+  assert.equal(xTick.textContent, '0')
+  assert.equal(yTick.textContent, '100')
+  assert.equal(path.getAttribute('d'), 'M 10 90 L 60 50 M 80 34 L 110 10')
+  assert.equal(plot.root.dataset.xMin, '0')
+  assert.equal(plot.root.dataset.xMax, '10')
+})
+
+test('logarithmic zoom keeps linked cursor values accurate across different visible ranges', () => {
+  const group = `log-linked-${plotSequence}`
+  const magnitude = engineeringPlot({ group, paths: [seriesPath('magnitude', 'Magnitude', 'M 10 90 L 60 50 L 110 10')] })
+  const phase = engineeringPlot({ group, paths: [seriesPath('phase', 'Phase', 'M 10 10 L 60 30 L 110 50')] })
+  for (const plot of [magnitude, phase]) {
+    Object.assign(plot.root.dataset, { xMin: '0.01', xMax: '100', xScale: 'log10' })
+  }
+  const scope = new FakeElement('section')
+  scope.append(magnitude.root, phase.root)
+  applyChartInspection(scope)
+  magnitude.root.emit('click', { target: magnitude.controls.zoomIn })
+  magnitude.root.emit('keydown', { key: 'Home', preventDefault() {} })
+  assert.equal(magnitude.readout.textContent, 'x 1; Magnitude 50')
+  assert.equal(phase.readout.textContent, 'x 1; Phase 75')
+  // A linked cursor outside this plot's visible range must not appear in its margins.
+  phase.root.emit('keydown', { key: 'Home', preventDefault() {} })
+  assert.equal(magnitude.svg.querySelector('[data-chart-cursor]').hasAttribute('hidden'), true)
+  assert.equal(phase.readout.textContent, 'x 0.01; Phase 100')
+})
+
+test('pointer and keyboard preserve both branches at repeated complex-plane X coordinates', () => {
+  const plot = engineeringPlot({ group: `complex-${plotSequence}`, paths: [seriesPath('nyquist', 'Nyquist', 'M 60 20 L 80 50 L 60 80')] })
+  applyChartInspection(plot.root)
+  plot.root.emit('pointermove', { plotX: 60, plotY: 80 })
+  assert.equal(plot.readout.textContent, 'x 5; Nyquist 12.5')
+  plot.root.emit('keydown', { key: 'Home', preventDefault() {} })
+  assert.equal(plot.readout.textContent, 'x 5; Nyquist 87.5')
+  plot.root.emit('keydown', { key: 'ArrowRight', preventDefault() {} })
+  assert.equal(plot.readout.textContent, 'x 7; Nyquist 50')
+  plot.root.emit('keydown', { key: 'ArrowRight', preventDefault() {} })
+  assert.equal(plot.readout.textContent, 'x 5; Nyquist 12.5')
+})
+
+test('pointer inspection uses SVG screen coordinates inside a letterboxed expanded plot', () => {
+  const plot = engineeringPlot({ group: `letterbox-${plotSequence}`, paths: [seriesPath('response', 'Response', 'M 10 90 L 60 50 L 110 10')] })
+  plot.svg.getScreenCTM = () => ({ inverse: () => ({ scale: 2, left: 100, top: 200 }) })
+  plot.svg.createSVGPoint = () => ({ x: 0, y: 0, matrixTransform(matrix) {
+    return { x: (this.x - matrix.left) / matrix.scale, y: (this.y - matrix.top) / matrix.scale }
+  } })
+  applyChartInspection(plot.root)
+  plot.root.emit('pointermove', { clientX: 220, clientY: 300 })
+  assert.equal(plot.readout.textContent, 'x 5; Response 50')
+})
+
+test('pole-zero marker-only plots support pointer and ordered keyboard inspection', () => {
+  const plot = engineeringPlot({ group: `markers-${plotSequence}`, paths: [] })
+  plot.svg.append(new FakeElement('text', { attributes: { class: 'analysis-marker analysis-marker-pole', x: '40', y: '30' } }),
+    new FakeElement('text', { attributes: { class: 'analysis-marker analysis-marker-zero', x: '70', y: '70' } }))
+  applyChartInspection(plot.root)
+  plot.root.emit('pointermove', { plotX: 70, plotY: 70 })
+  assert.equal(plot.readout.textContent, 'x 6; Zero 25')
+  plot.root.emit('keydown', { key: 'Home', preventDefault() {} })
+  assert.equal(plot.readout.textContent, 'x 3; Pole 75')
+  plot.root.emit('keydown', { key: 'ArrowRight', preventDefault() {} })
+  assert.equal(plot.readout.textContent, 'x 6; Zero 25')
+})
+
+test('expanded plot retains series toggles and cursor interaction after moving outside the workbench', () => {
+  const workspace = new FakeElement('main', { dataset: { flowId: 'expanded-test' } })
+  const plot = engineeringPlot({ group: `expanded-${plotSequence}`, paths: [seriesPath('response', 'Response', 'M 10 90 L 60 50 L 110 10')] })
+  const toggle = new FakeElement('button', { dataset: { seriesToggle: 'response' } })
+  plot.root.append(toggle)
+  workspace.append(plot.root)
+  const oldQuery = fakeDocument.querySelector
+  const oldQueryAll = fakeDocument.querySelectorAll
+  const oldStorage = globalThis.localStorage
+  const storage = new Map()
+  fakeDocument.querySelector = (selector) => selector === '#workbench' ? workspace : null
+  fakeDocument.querySelectorAll = (selector) => plot.root.matches(selector) ? [plot.root] : []
+  globalThis.localStorage = { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) }
+  try {
+    applyChartInspection(plot.root)
+    plot.root.remove()
+    new FakeElement('dialog').append(plot.root)
+    plot.root.isConnected = true
+    for (const handler of documentListeners.get('click')) handler({ target: toggle })
+    assert.equal(toggle.getAttribute('aria-pressed'), 'false')
+    assert.equal(plot.svg.querySelector('[data-series-path]').hasAttribute('hidden'), true)
+    for (const handler of documentListeners.get('click')) handler({ target: toggle })
+    assert.equal(toggle.getAttribute('aria-pressed'), 'true')
+    plot.root.emit('keydown', { key: 'Home', preventDefault() {} })
+    assert.equal(plot.readout.textContent, 'x 0; Response 0')
+  } finally {
+    fakeDocument.querySelector = oldQuery
+    fakeDocument.querySelectorAll = oldQueryAll
+    globalThis.localStorage = oldStorage
+  }
 })

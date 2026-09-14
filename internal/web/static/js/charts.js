@@ -1,3 +1,4 @@
+import { saveChartPNG } from './chart-export.js'
 import { workbench } from './dom.js'
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg'
@@ -164,25 +165,6 @@ export function inspectionIndexForKey(key, currentIndex, count) {
   }
 }
 
-export function zoomedViewBox(base, zoom, anchor = {}) {
-  const values = [base?.x, base?.y, base?.width, base?.height]
-  if (!values.every(Number.isFinite) || base.width <= 0 || base.height <= 0) return null
-  const boundedZoom = Math.min(MAX_CHART_ZOOM, Math.max(MIN_CHART_ZOOM, zoom))
-  const anchorX = Number.isFinite(anchor.x) ? anchor.x : base.x + base.width / 2
-  const anchorY = Number.isFinite(anchor.y) ? anchor.y : base.y + base.height / 2
-  const width = base.width / boundedZoom
-  const height = base.height / boundedZoom
-  const xFraction = Math.min(1, Math.max(0, (anchorX - base.x) / base.width))
-  const yFraction = Math.min(1, Math.max(0, (anchorY - base.y) / base.height))
-  return {
-    x: Math.min(base.x + base.width - width, Math.max(base.x, anchorX - xFraction * width)),
-    y: Math.min(base.y + base.height - height, Math.max(base.y, anchorY - yFraction * height)),
-    width,
-    height,
-    zoom: boundedZoom
-  }
-}
-
 export function createInspectionCoordinator() {
   const groups = new Map()
 
@@ -259,18 +241,25 @@ function isHidden(path) {
 }
 
 function readSeries(root) {
-  return [...root.querySelectorAll('[data-series-path]')]
+  const paths = [...root.querySelectorAll('[data-series-path]')]
     .map((path) => ({
       key: path.dataset?.seriesPath || '',
       name: path.dataset?.seriesName || path.dataset?.seriesPath || 'series',
       hidden: isHidden(path),
       vertices: parsePathVertices(path.getAttribute('d') || '')
     }))
-    .filter((series) => series.vertices.length > 0)
+  const markers = [...root.querySelectorAll('.analysis-marker')].map((marker, index) => ({
+    key: `marker:${index}`,
+    name: (marker.getAttribute('class') || '').includes('analysis-marker-pole') ? 'Pole'
+      : (marker.getAttribute('class') || '').includes('analysis-marker-zero') ? 'Zero' : 'Marker',
+    hidden: isHidden(marker),
+    vertices: [{ x: Number(marker.getAttribute('x')), y: Number(marker.getAttribute('y')) }]
+  }))
+  return [...paths, ...markers].filter((series) => series.vertices.length > 0)
 }
 
 function findSVG(root) {
-  return root.tagName?.toLowerCase() === 'svg' ? root : root.querySelector('svg')
+  return root.tagName?.toLowerCase() === 'svg' ? root : [...root.querySelectorAll('svg')].find(svg => svg.getAttribute('aria-hidden') !== 'true')
 }
 
 function findReadout(root) {
@@ -326,6 +315,7 @@ function ensureCursor(state) {
   group.setAttribute('data-chart-cursor', '')
   group.setAttribute('hidden', '')
   group.style.pointerEvents = 'none'
+  if (state.clipURL) group.setAttribute('clip-path', state.clipURL)
   const xLine = createSVGElement(state.svg, 'line', 'chart-cursor-line chart-cursor-line-x')
   const yLine = createSVGElement(state.svg, 'line', 'chart-cursor-line chart-cursor-line-y')
   xLine.setAttribute('data-chart-cursor-x', '')
@@ -371,12 +361,21 @@ function showInspection(state, domainX, detail = {}) {
     state.config.left, state.config.right, state.config.xScale)
   if (!Number.isFinite(targetX)) return
 
-  const values = seriesValuesAtX(readSeries(state.root), targetX)
+  if (targetX < state.config.left || targetX > state.config.right) {
+    state.clear()
+    return
+  }
+  let values = seriesValuesAtX(visibleSeries(state), targetX)
   if (values.length === 0) {
     state.clear()
     return
   }
   const active = values.find((entry) => entry.key === detail.activeKey) || values[0]
+  if (detail.point && active.key === detail.activeKey) {
+    active.point = nearestVertex(active.vertices, detail.point.x, detail.point.y) || active.point
+  }
+  values = values.filter((entry) => !entry.key.startsWith('marker:') || entry === active)
+  state.activeKey = active.key
   const cursorX = active.point.x
   const actualDomainX = invertScale(cursorX, state.config.left, state.config.right,
     state.config.xMin, state.config.xMax, state.config.xScale)
@@ -434,15 +433,108 @@ function syncZoomControls(state) {
   })
 }
 
+let clipSequence = 0
+
+// Zoom in scale coordinates: logarithmic axes narrow by decades, not by
+// arithmetic distance. The SVG viewport and all text sizes stay unchanged.
+export function zoomedPlotConfig(base, current, zoom, anchor = {}) {
+  const bounded = Math.min(MAX_CHART_ZOOM, Math.max(MIN_CHART_ZOOM, zoom))
+  const next = { ...base }
+  for (const axis of ['x', 'y']) {
+    const min = `${axis}Min`
+    const max = `${axis}Max`
+    const kind = base[`${axis}Scale`]
+    const forward = (value) => kind === 'log10' ? Math.log10(value) : value
+    const inverse = (value) => kind === 'log10' ? 10 ** value : value
+    const lower = forward(base[min])
+    const upper = forward(base[max])
+    const currentLower = forward(current[min])
+    const currentUpper = forward(current[max])
+    const position = Number.isFinite(anchor[axis]) ? forward(anchor[axis]) : (currentLower + currentUpper) / 2
+    const fraction = Math.max(0, Math.min(1, (position - currentLower) / (currentUpper - currentLower)))
+    const span = (upper - lower) / bounded
+    const start = Math.max(lower, Math.min(upper - span, position - fraction * span))
+    next[min] = bounded === 1 ? base[min] : inverse(start)
+    next[max] = bounded === 1 ? base[max] : inverse(start + span)
+  }
+  return next
+}
+
+function initializeZoomGeometry(state) {
+  state.baseConfig = { ...state.config }
+  const { svg, config } = state
+  const clip = createSVGElement(svg, 'clipPath')
+  const id = `chart-data-clip-${++clipSequence}`
+  clip.setAttribute('id', id)
+  clip.setAttribute('clipPathUnits', 'userSpaceOnUse')
+  const rect = createSVGElement(svg, 'rect')
+  rect.setAttribute('x', config.left)
+  rect.setAttribute('y', config.top)
+  rect.setAttribute('width', config.right - config.left)
+  rect.setAttribute('height', config.bottom - config.top)
+  clip.append(rect)
+  const defs = createSVGElement(svg, 'defs')
+  defs.append(clip)
+  svg.append(defs)
+  state.clipURL = `url(#${id})`
+  state.geometry = [...svg.querySelectorAll('path, .chart-reference, .chart-reference-label, .analysis-marker')].map((element) => {
+    element.setAttribute('clip-path', state.clipURL)
+    const attributes = {}
+    for (const name of ['d', 'x', 'y', 'x1', 'x2', 'y1', 'y2']) {
+      const value = element.getAttribute(name)
+      if (value !== null) attributes[name] = value
+    }
+    return { element, attributes }
+  })
+  state.ticks = [...svg.querySelectorAll('.x-label, .y-label')].map((element) => ({
+    element,
+    text: element.textContent,
+    axis: element.classList.contains('x-label') ? 'x' : 'y'
+  }))
+}
+
+function renderZoomGeometry(state) {
+  const { baseConfig: base, config } = state
+  const mapX = (pixel) => scaleValue(invertScale(pixel, base.left, base.right, base.xMin, base.xMax, base.xScale),
+    config.xMin, config.xMax, config.left, config.right, config.xScale)
+  const mapY = (pixel) => scaleValue(invertScale(pixel, base.bottom, base.top, base.yMin, base.yMax, base.yScale),
+    config.yMin, config.yMax, config.bottom, config.top, config.yScale)
+  for (const { element, attributes } of state.geometry) {
+    for (const [name, value] of Object.entries(attributes)) {
+      if (state.zoom === 1) {
+        element.setAttribute(name, value)
+      } else if (name === 'd') {
+        // Server paths use absolute M/L coordinates. Preserve each move so
+        // discontinuities and independent loci never gain a connecting segment.
+        element.setAttribute(name, value.replace(/([ML])\s*([-+\d.eE]+)[ ,]+([-+\d.eE]+)/g,
+          (_, command, x, y) => `${command} ${mapX(Number(x))} ${mapY(Number(y))}`))
+      } else {
+        element.setAttribute(name, String(name.startsWith('x') ? mapX(Number(value)) : mapY(Number(value))))
+      }
+    }
+  }
+  for (const { element, text, axis } of state.ticks) {
+    const pixel = Number(element.getAttribute(axis))
+    element.textContent = state.zoom === 1 ? text : formatNumber(axis === 'x'
+      ? invertScale(pixel, config.left, config.right, config.xMin, config.xMax, config.xScale)
+      : invertScale(pixel, config.bottom, config.top, config.yMin, config.yMax, config.yScale))
+  }
+}
+
 function setChartZoom(state, nextZoom) {
   if (!state.baseViewBox) return
-  const viewBox = zoomedViewBox(state.baseViewBox, nextZoom, {
-    x: state.cursorPixelX,
-    y: state.cursorPixelY
-  })
-  if (!viewBox) return
-  state.zoom = viewBox.zoom
-  state.svg.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`)
+  if (!state.baseConfig) initializeZoomGeometry(state)
+  const anchor = {
+    x: state.domainX,
+    y: invertScale(state.cursorPixelY, state.config.bottom, state.config.top,
+      state.config.yMin, state.config.yMax, state.config.yScale)
+  }
+  state.config = zoomedPlotConfig(state.baseConfig, state.config, nextZoom, anchor)
+  state.zoom = Math.min(MAX_CHART_ZOOM, Math.max(MIN_CHART_ZOOM, nextZoom))
+  for (const name of ['xMin', 'xMax', 'yMin', 'yMax']) state.root.dataset[name] = String(state.config[name])
+  renderZoomGeometry(state)
+  state.cursor?.group.setAttribute('clip-path', state.clipURL)
+  clearInspection(state)
   syncZoomControls(state)
 }
 
@@ -452,6 +544,42 @@ function closestControl(state, event, selector) {
 }
 
 function activateChartControl(state, event) {
+  const expandButton = closestControl(state, event, '[data-chart-expand]')
+  if (expandButton) {
+    const marker = document.createComment('expanded plot position')
+    const dialog = document.createElement('dialog')
+    dialog.className = 'plot-dialog'
+    dialog.setAttribute('aria-label', 'Expanded plot')
+    const close = document.createElement('button')
+    close.type = 'button'
+    close.className = 'plot-dialog-close'
+    close.textContent = '×'
+    close.setAttribute('aria-label', 'Close expanded view')
+    close.title = 'Close expanded view (Esc)'
+    state.root.before(marker)
+    dialog.append(close, state.root)
+    document.body.append(dialog)
+    expandButton.hidden = true
+    close.addEventListener('click', () => dialog.close())
+    dialog.addEventListener('close', () => {
+      marker.replaceWith(state.root)
+      expandButton.hidden = false
+      dialog.remove()
+      expandButton.focus()
+    }, { once: true })
+    dialog.showModal()
+    close.focus()
+    return
+  }
+  const exportButton = closestControl(state, event, '[data-chart-png]')
+  if (exportButton) {
+    exportButton.disabled = true
+    saveChartPNG(state.root, state.svg).catch(() => {
+      const readout = state.root.querySelector('[data-chart-readout]')
+      if (readout) readout.textContent = 'PNG export failed. Please try again.'
+    }).finally(() => { exportButton.disabled = false })
+    return
+  }
   if (closestControl(state, event, '[data-chart-characteristics]')) {
     toggleCharacteristics(state)
     return
@@ -478,6 +606,19 @@ function eventPoint(event, state) {
   if (Number.isFinite(event.plotX) && Number.isFinite(event.plotY)) {
     return { x: event.plotX, y: event.plotY }
   }
+  // The SVG can be letterboxed inside its CSS box, particularly in the
+  // expanded dialog. Its screen transform accounts for preserveAspectRatio.
+  const matrix = state.svg.getScreenCTM?.()
+  if (matrix && state.svg.createSVGPoint) {
+    const point = state.svg.createSVGPoint()
+    point.x = event.clientX
+    point.y = event.clientY
+    try {
+      return point.matrixTransform(matrix.inverse())
+    } catch {
+      return null
+    }
+  }
   const bounds = state.svg.getBoundingClientRect?.()
   const viewBox = state.svg.viewBox?.baseVal
   if (!bounds || bounds.width === 0 || bounds.height === 0) return null
@@ -491,43 +632,53 @@ function eventPoint(event, state) {
   }
 }
 
+function visibleSeries(state) {
+  return readSeries(state.root).map((series) => ({
+    ...series,
+    vertices: series.vertices.filter((point) => point.x >= state.config.left && point.x <= state.config.right)
+  }))
+}
+
 function inspectPointer(state, event) {
   const point = eventPoint(event, state)
   if (!point || point.x < state.config.left || point.x > state.config.right ||
       point.y < state.config.top || point.y > state.config.bottom) return
-  const visible = readSeries(state.root).filter((series) => !series.hidden)
+  const visible = visibleSeries(state).filter((series) => !series.hidden)
   const candidates = visible.flatMap((series) =>
     series.vertices.map((vertex) => ({ ...vertex, key: series.key })))
   const nearest = nearestVertex(candidates, point.x, point.y)
   if (!nearest) return
   const domainX = invertScale(nearest.x, state.config.left, state.config.right,
     state.config.xMin, state.config.xMax, state.config.xScale)
-  inspectionCoordinator.inspect(state.config.group, state, domainX, { activeKey: nearest.key })
-}
-
-function keyboardVertices(state) {
-  return [...new Set(readSeries(state.root)
-    .filter((series) => !series.hidden)
-    .flatMap((series) => series.vertices.map((point) => point.x)))]
-    .sort((left, right) => left - right)
+  inspectionCoordinator.inspect(state.config.group, state, domainX, { activeKey: nearest.key, point: nearest })
 }
 
 function inspectKeyboard(state, event) {
+  // Toolbar buttons and form controls keep their native keyboard behavior.
+  if (event.target && event.target !== state.root && event.target.closest?.('button, input, select, textarea')) return
   if (event.key === 'Escape') {
     event.preventDefault()
     inspectionCoordinator.clear(state.config.group)
     return
   }
-  const vertices = keyboardVertices(state)
+  const series = visibleSeries(state).filter((entry) => !entry.hidden && entry.vertices.length)
+  const active = series.find((entry) => entry.key === state.activeKey) || series[0]
+  if (!active) return
+  // Preserve sample order, including repeated X positions on complex-plane
+  // curves. Sorting/deduplicating X loses half of a closed Nyquist curve.
+  const vertices = series.every((entry) => entry.key.startsWith('marker:'))
+    ? series.flatMap((entry) => entry.vertices.map((point) => ({ ...point, key: entry.key })))
+    : active.vertices
   const current = Number.isFinite(state.cursorPixelX)
-    ? nearestVertex(vertices.map((x) => ({ x, y: 0 })), state.cursorPixelX)?.index ?? -1
+    ? nearestVertex(vertices, state.cursorPixelX, state.cursorPixelY)?.index ?? -1
     : -1
   const next = inspectionIndexForKey(event.key, current, vertices.length)
   if (next === undefined || next === null) return
   event.preventDefault()
-  const domainX = invertScale(vertices[next], state.config.left, state.config.right,
+  const point = vertices[next]
+  const domainX = invertScale(point.x, state.config.left, state.config.right,
     state.config.xMin, state.config.xMax, state.config.xScale)
-  inspectionCoordinator.inspect(state.config.group, state, domainX)
+  inspectionCoordinator.inspect(state.config.group, state, domainX, { activeKey: point.key || active.key, point })
 }
 
 function initializePlot(root) {
@@ -541,6 +692,7 @@ function initializePlot(root) {
       existing.cursor = null
       existing.baseViewBox = readViewBox(svg)
       existing.zoom = MIN_CHART_ZOOM
+      existing.baseConfig = null
     }
     const readout = findReadout(root)
     if (existing.readout !== readout) existing.idleReadout = readout?.textContent || ''
@@ -555,6 +707,7 @@ function initializePlot(root) {
   const readout = findReadout(root)
   const state = {
     root,
+    workspace: workbench(),
     svg,
     config,
     readout,
@@ -620,34 +773,48 @@ export function applyChartInspection(scope = globalThis.document) {
   return plotRoots(scope).map(initializePlot).filter(Boolean)
 }
 
+function workspaceChartRoots(root) {
+  const detached = plotRoots(globalThis.document).filter((plot) =>
+    plotStates.get(plot)?.workspace === root && !root.contains(plot))
+  return [root, ...detached]
+}
+
+function workspaceContainsChartControl(root, control) {
+  return root && workspaceChartRoots(root).some((scope) => scope.contains(control))
+}
+
+function workspaceChartElements(root, selector) {
+  return workspaceChartRoots(root).flatMap((scope) => [...scope.querySelectorAll(selector)])
+}
+
 export function applySeriesVisibility() {
   const root = workbench()
   if (!root) return
   const hidden = hiddenSeries()
-  const buttons = [...root.querySelectorAll('[data-series-toggle]')]
+  const buttons = workspaceChartElements(root, '[data-series-toggle]')
   buttons.forEach((button) => {
     const isVisible = !hidden.has(button.dataset.seriesToggle)
     button.setAttribute('aria-pressed', String(isVisible))
   })
-  root.querySelectorAll('[data-series-path]').forEach((path) => {
+  workspaceChartElements(root, '[data-series-path]').forEach((path) => {
     path.toggleAttribute('hidden', hidden.has(path.dataset.seriesPath))
   })
-  root.querySelectorAll('[data-series-panel]').forEach((panel) => {
+  workspaceChartElements(root, '[data-series-panel]').forEach((panel) => {
     panel.toggleAttribute('hidden', hidden.has(panel.dataset.seriesPanel))
   })
   const keys = new Set(buttons.map((button) => button.dataset.seriesToggle))
-  root.querySelectorAll('[data-series-show-all]').forEach((button) => {
+  workspaceChartElements(root, '[data-series-show-all]').forEach((button) => {
     button.disabled = ![...keys].some((key) => hidden.has(key))
   })
   applyTrendLayout(root)
-  for (const state of applyChartInspection(root)) {
+  for (const state of workspaceChartRoots(root).flatMap((scope) => applyChartInspection(scope))) {
     if (Number.isFinite(state.domainX)) state.show(state.domainX)
   }
 }
 
 function updateSeriesSelection(root, selectedKey, isolate) {
   const hidden = hiddenSeries()
-  const keys = [...root.querySelectorAll('[data-series-toggle]')]
+  const keys = workspaceChartElements(root, '[data-series-toggle]')
     .map((button) => button.dataset.seriesToggle)
   if (isolate) {
     for (const key of keys) {
@@ -679,12 +846,12 @@ if (typeof document !== 'undefined') {
       return
     }
     const button = event.target.closest('[data-series-toggle]')
-    if (!button || !workbench()?.contains(button)) return
+    if (!button || !workspaceContainsChartControl(workbench(), button)) return
     updateSeriesSelection(workbench(), button.dataset.seriesToggle, false)
   })
   document.addEventListener('dblclick', (event) => {
     const button = event.target.closest('[data-series-toggle]')
-    if (!button || !workbench()?.contains(button)) return
+    if (!button || !workspaceContainsChartControl(workbench(), button)) return
     event.preventDefault()
     updateSeriesSelection(workbench(), button.dataset.seriesToggle, true)
   })
