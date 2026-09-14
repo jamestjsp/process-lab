@@ -1812,7 +1812,7 @@ body.is-resizing-dock .studio-grid {
 }
 
 .trend-panel-split .trend-chart {
-  height: 180px;
+  height: auto;
 }
 
 /* The chart SVG carries a fixed 780-unit viewBox, so its type shrinks
@@ -1882,13 +1882,13 @@ body.is-resizing-dock .studio-grid {
 
 .trend-chart {
   width: 100%;
-  min-width: 640px;
-  height: 228px;
+  min-width: 0;
+  height: auto;
   display: block;
 }
 
 .spectrum-chart {
-  height: 190px;
+  height: auto;
 }
 
 .spectrum-path {
