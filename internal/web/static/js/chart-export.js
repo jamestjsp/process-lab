@@ -9,18 +9,22 @@ export async function saveChartPNG(root, svg) {
       copies[index].style.setProperty(property, style.getPropertyValue(property))
     }
   })
-  const bounds = svg.getBoundingClientRect()
-  const width = Math.max(1, Math.round(bounds.width * 2))
+  const width = 1920
+  const height = 1080
+  const padding = 40
   const title = root.querySelector('figcaption strong, figcaption > span')?.textContent?.trim() || 'Process Lab plot'
   const legend = [...svg.querySelectorAll('[data-series-path]')]
     .filter(path => getComputedStyle(path).display !== 'none' && !path.hasAttribute('hidden'))
     .map(path => ({ name: path.dataset.seriesName || path.dataset.seriesPath, color: getComputedStyle(path).stroke }))
   const headerHeight = 70 + legend.length * 30
   const viewBox = svg.viewBox.baseVal
-  const height = Math.max(1, Math.round(width * viewBox.height / viewBox.width))
+  const scale = Math.min((width - padding * 2) / viewBox.width,
+    (height - headerHeight - padding * 2) / viewBox.height)
+  const plotWidth = Math.round(viewBox.width * scale)
+  const plotHeight = Math.round(viewBox.height * scale)
   copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  copy.setAttribute('width', width)
-  copy.setAttribute('height', height)
+  copy.setAttribute('width', plotWidth)
+  copy.setAttribute('height', plotHeight)
   // Data images are permitted by the app policy; blob images are not.
   const source = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(copy))
   let download
@@ -30,7 +34,7 @@ export async function saveChartPNG(root, svg) {
     await image.decode()
     const canvas = document.createElement('canvas')
     canvas.width = width
-    canvas.height = height + headerHeight + 24
+    canvas.height = height
     const context = canvas.getContext('2d')
     context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--housing-raised').trim() || '#fff'
     context.fillRect(0, 0, width, canvas.height)
@@ -48,7 +52,8 @@ export async function saveChartPNG(root, svg) {
       context.stroke()
       context.fillText(series.name, 62, y + 6)
     })
-    context.drawImage(image, 0, headerHeight, width, height)
+    context.drawImage(image, (width - plotWidth) / 2,
+      headerHeight + (height - headerHeight - plotHeight) / 2, plotWidth, plotHeight)
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
     if (!blob) throw new Error('PNG encoding failed')
     download = URL.createObjectURL(blob)
