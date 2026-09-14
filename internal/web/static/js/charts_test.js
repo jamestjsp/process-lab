@@ -531,3 +531,25 @@ test('expanded plot retains series toggles and cursor interaction after moving o
     globalThis.localStorage = oldStorage
   }
 })
+
+
+test('zoom rebuilds clipping and source geometry after an identity-preserving morph', () => {
+  const path = seriesPath('response', 'Response', 'M 10 90 L 60 50 L 110 10')
+  const plot = engineeringPlot({ group: `morph-${plotSequence}`, paths: [path] })
+  const originalDataset = { ...plot.root.dataset }
+  applyChartInspection(plot.root)
+  plot.root.emit('click', { target: plot.controls.zoomIn })
+  const clip = path.getAttribute('clip-path')
+  // A server morph keeps the SVG but restores server attributes and children.
+  plot.svg.children.find((child) => child.tagName === 'DEFS').remove()
+  path.setAttribute('d', 'M 10 80 L 60 40 L 110 20')
+  path.removeAttribute('clip-path')
+  plot.root.dataset = { ...originalDataset }
+  applyChartInspection(plot.root)
+  assert.equal(plot.root.dataset.chartZoom, '1')
+  plot.root.emit('click', { target: plot.controls.zoomIn })
+  assert.notEqual(path.getAttribute('clip-path'), clip)
+  assert.ok(plot.svg.children.some((child) => child.tagName === 'DEFS'))
+  plot.root.emit('click', { target: plot.controls.reset })
+  assert.equal(path.getAttribute('d'), 'M 10 80 L 60 40 L 110 20')
+})

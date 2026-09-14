@@ -474,6 +474,7 @@ function initializeZoomGeometry(state) {
   rect.setAttribute('height', config.bottom - config.top)
   clip.append(rect)
   const defs = createSVGElement(svg, 'defs')
+  state.clip = clip
   defs.append(clip)
   svg.append(defs)
   state.clipURL = `url(#${id})`
@@ -688,7 +689,7 @@ function initializePlot(root) {
 
   const existing = plotStates.get(root)
   if (existing) {
-    if (existing.svg !== svg) {
+    if (existing.svg !== svg || (existing.baseConfig && !svg.contains(existing.clip))) {
       existing.cursor = null
       existing.baseViewBox = readViewBox(svg)
       existing.zoom = MIN_CHART_ZOOM

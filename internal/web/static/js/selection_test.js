@@ -15,15 +15,17 @@ globalThis.document = {
   querySelector: (selector) => ({ '#workbench': root, '.property-form input[name="name"]': field })[selector] ?? null,
   querySelectorAll: () => []
 }
+let requests = 0
 let complete
 globalThis.htmx = {
   ajax(method, path) {
+    requests++
     assert.equal(method, 'GET')
     assert.match(path, /selected=2$/)
     return new Promise((resolve) => { complete = resolve })
   }
 }
-const { editBlock } = await import('./selection.js')
+const { editBlock, selectBlock } = await import('./selection.js')
 
 test('editing opens a collapsed inspector and focuses only the requested block after rendering', async () => {
   const pending = editBlock({ dataset: { blockId: '2' } })
@@ -40,4 +42,20 @@ test('editing opens a collapsed inspector and focuses only the requested block a
   complete()
   await superseded
   assert.equal(focused, 1, 'a newer selection must not lose focus')
+})
+
+
+test('double-click reuses both pointer releases while selection is in flight', async () => {
+  root.dataset.selectedId = '1'
+  const before = requests
+  const node = { dataset: { blockId: '2' } }
+  const first = selectBlock(node)
+  assert.equal(selectBlock(node), first)
+  const editing = editBlock(node)
+  assert.equal(requests - before, 1)
+  const previousFocus = focused
+  root.dataset.selectedId = '2'
+  complete()
+  await editing
+  assert.equal(focused, previousFocus + 1)
 })
