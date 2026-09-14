@@ -208,6 +208,13 @@ this browser and applied before the page is painted; System follows operating
 system appearance changes. Themes share semantic color tokens in `tokens.css`
 and do not change models, plots, or panel layout.
 
+Plot toolbars provide data-range zoom, reset, cursor inspection, reference-line
+visibility, PNG export, and an expanded analysis view. Zoom keeps the axes and
+text at a fixed size. Analysis cards use at most two columns and fall back to a
+single column in narrow panels. Expand opens a larger view; close it with the
+corner button or Escape. PNG export preserves the current data window and
+visible series, adds the title and legend, and uses the chart's proportions.
+
 On desktop, the window is a fixed application shell: the canvas is the only
 region that grows. At 860px and below, the interface stacks and the page
 scrolls so every control remains reachable without horizontal overflow. Both

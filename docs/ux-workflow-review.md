@@ -44,4 +44,3 @@ keyboard recovery, editor focus ordering and superseded selection, and the
 distinction between never-run and edited-model messages. `git diff --check`
 passes. The actual UI checks above used the integrated browser; the repository's
 separate headless Chrome suite was not run.
-

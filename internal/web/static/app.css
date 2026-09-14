@@ -2320,7 +2320,7 @@ body.is-resizing-dock .studio-grid {
 
 .analysis-plots {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding: 8px;
 }
@@ -3968,3 +3968,43 @@ body.is-resizing-dock .studio-grid {
   color: var(--ink, #1c1a17);
   font: inherit;
 }
+
+/* Keep plot controls reachable without horizontal scrolling. */
+.chart-tools { flex-wrap: wrap; overflow: visible; gap: 6px; padding: 8px; }
+.chart-tools button { min-height: 30px; font-size: 11px; }
+.chart-tools button[hidden] { display: none; }
+.analysis-plots { gap: 16px; padding: 12px; }
+.analysis-plot svg { min-width: 0; }
+.analysis-plot figcaption { flex-wrap: wrap; font-size: 12px; padding: 10px; }
+.analysis-plots { container-type: inline-size; }
+@container (max-width: 900px) { .analysis-plots > .analysis-plot { grid-column: 1 / -1; } }
+.plot-dialog {
+  width: min(1400px, 94vw); max-width: 94vw; height: 90vh; max-height: 90vh;
+  padding: 16px; border: 1px solid var(--sheet-line); border-radius: 12px;
+  background: var(--sheet-card); color: var(--ink); overflow: auto;
+}
+.plot-dialog::backdrop { background: #0009; }
+.plot-dialog-close { display: block; margin: 0 0 12px auto; padding: 8px 12px; cursor: pointer; }
+.plot-dialog .analysis-plot, .plot-dialog .trend-panel { width: 100%; margin: 0; }
+.plot-dialog svg { width: 100%; height: auto; max-height: 65vh; }
+
+.chart-tools button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 6px; }
+.chart-tools button svg { width: 18px; height: 18px; min-width: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.analysis-workspace { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.analysis-workspace > * { min-width: 0; }
+.analysis-results { grid-template-columns: minmax(0, 1fr); }
+
+.plot-dialog-close {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0;
+  border: 1px solid var(--sheet-line); border-radius: 6px;
+  background: var(--sheet-card); color: var(--ink-muted);
+  font: 24px/1 sans-serif;
+}
+.plot-dialog-close:hover { color: var(--ink); background: var(--housing-deep); }
+.plot-dialog-close:focus-visible { outline: 2px solid var(--probe); outline-offset: 2px; }
+
+.trend-chart .axis-title { text-anchor: middle; transform: none; }
+/* SVG does not receive the HTML hidden-element rendering rule. */
+[data-chart-characteristic][hidden],
+[data-chart-cursor][hidden] { display: none; }

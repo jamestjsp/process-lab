@@ -33,11 +33,11 @@
   </div>
   {{end}}
   <div class="chart-tools" role="group" aria-label="{{.Title}} controls">
-    <button type="button" data-chart-characteristics aria-pressed="true">Characteristics</button>
-    <button type="button" data-chart-zoom-in>Zoom in</button>
-    <button type="button" data-chart-zoom-out>Zoom out</button>
-    <button type="button" data-chart-clear>Clear cursor</button>
-    <button type="button" data-chart-reset>Reset</button>
+    <button type="button" data-chart-characteristics aria-pressed="true" aria-label="Characteristics" title="Characteristics"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16M7 15V9m5 6V5m5 10v-4"/></svg></button>
+    <button type="button" data-chart-zoom-in aria-label="Zoom in" title="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6m-3-3v6"/></svg></button>
+    <button type="button" data-chart-zoom-out aria-label="Zoom out" title="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6"/></svg></button>
+    <button type="button" data-chart-clear aria-label="Clear cursor" title="Clear cursor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v5m0 8v5M3 12h5m8 0h5M9 9l6 6m0-6-6 6"/></svg></button>
+    <button type="button" data-chart-reset aria-label="Reset" title="Reset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></svg></button><button type="button" data-chart-png aria-label="Save PNG" title="Save PNG"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg></button><button type="button" data-chart-expand aria-label="Expand" title="Expand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/></svg></button>
   </div>
   <svg viewBox="0 0 400 140" role="img" aria-labelledby="{{.Plot.ID}}-caption">
     {{range .Plot.YTicks}}
@@ -180,13 +180,13 @@
         <span class="eyebrow">Library</span>
         <h2>Model blocks</h2>
         <p>Add a block, then wire output ports to inputs.</p>
-      </div>
-      <div class="palette-list" id="block-catalogue">
-        {{range .Palette}}
         <label class="palette-search" for="block-search">Find a block
           <input id="block-search" type="search" placeholder="Name, category, or description" autocomplete="off" aria-controls="block-catalogue" aria-describedby="block-search-status">
         </label>
         <small id="block-search-status" role="status" aria-live="polite"></small>
+      </div>
+      <div class="palette-list" id="block-catalogue">
+        {{range .Palette}}
         <form method="post" action="/flows/{{$.Snapshot.Flow.ID}}/blocks?view={{$.Mode.Name}}" hx-post="/flows/{{$.Snapshot.Flow.ID}}/blocks?view={{$.Mode.Name}}" hx-target="#workbench" hx-swap="outerMorph">
           <input type="hidden" name="kind" value="{{.Kind}}">
           <input type="hidden" name="x" value="{{.X}}">
@@ -352,13 +352,13 @@
               <div data-trend-layout-panel="overlay">
                 <figure class="trend-panel" tabindex="0" {{template "engineering-plot-data" .Chart.Plot}}>
                   <figcaption class="trend-legend" id="{{.Chart.Plot.ID}}-caption"><strong>Signals together</strong><small>Last run {{.Chart.CreatedAt}}</small></figcaption>
-                  <div class="chart-tools" role="group" aria-label="Simulation trend controls"><button type="button" data-chart-characteristics aria-pressed="true">Characteristics</button><button type="button" data-chart-zoom-in>Zoom in</button><button type="button" data-chart-zoom-out>Zoom out</button><button type="button" data-chart-clear>Clear cursor</button><button type="button" data-chart-reset>Reset</button></div>
-                  <svg class="trend-chart" viewBox="0 0 780 228" role="img" aria-labelledby="{{.Chart.Plot.ID}}-caption">
+                  <div class="chart-tools" role="group" aria-label="Simulation trend controls"><button type="button" data-chart-characteristics aria-pressed="true" aria-label="Characteristics" title="Characteristics"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16M7 15V9m5 6V5m5 10v-4"/></svg></button><button type="button" data-chart-zoom-in aria-label="Zoom in" title="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6m-3-3v6"/></svg></button><button type="button" data-chart-zoom-out aria-label="Zoom out" title="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6"/></svg></button><button type="button" data-chart-clear aria-label="Clear cursor" title="Clear cursor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v5m0 8v5M3 12h5m8 0h5M9 9l6 6m0-6-6 6"/></svg></button><button type="button" data-chart-reset aria-label="Reset" title="Reset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></svg></button><button type="button" data-chart-png aria-label="Save PNG" title="Save PNG"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg></button><button type="button" data-chart-expand aria-label="Expand" title="Expand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/></svg></button></div>
+                  <svg class="trend-chart" viewBox="0 0 780 258" role="img" aria-labelledby="{{.Chart.Plot.ID}}-caption">
                     {{range .Chart.YGrid}}<line x1="{{$.Chart.Plot.Rect.Left}}" x2="{{$.Chart.Plot.Rect.Right}}" y1="{{.Position}}" y2="{{.Position}}" class="chart-grid"></line><text x="40" y="{{.Position}}" class="chart-label y-label">{{.Label}}</text>{{end}}
                     {{range $tickIndex, $tick := .Chart.XGrid}}<line x1="{{$tick.Position}}" x2="{{$tick.Position}}" y1="{{$.Chart.Plot.Rect.Top}}" y2="{{$.Chart.Plot.Rect.Bottom}}" class="chart-grid chart-grid-x"></line><text x="{{$tick.Position}}" y="218" class="chart-label x-label{{if eq $tickIndex 0}} x-label-first{{end}}">{{$tick.Label}}</text>{{end}}
                     <g data-chart-characteristic-lines data-chart-characteristic>{{range .Chart.Plot.References}}<line x1="{{.X1}}" y1="{{.Y1}}" x2="{{.X2}}" y2="{{.Y2}}" class="chart-reference chart-reference-{{.Kind}}"></line>{{end}}</g>
                     {{range .Chart.Paths}}<path d="{{.D}}" fill="none" stroke="{{.Color}}"{{if .Dash}} stroke-dasharray="{{.Dash}}"{{end}} class="trend-path" data-series-path="{{.Key}}" data-series-name="{{.Name}}"></path>{{end}}
-                    <text x="760" y="218" class="axis-title">seconds</text>
+                    <text x="405" y="246" class="axis-title">Time (seconds)</text>
                   </svg>
                   <output class="chart-readout" data-chart-readout aria-live="polite">Focus the plot, then use Left and Right arrows to inspect values.</output>
                 </figure>
@@ -368,13 +368,13 @@
                 {{range .Chart.SplitPlots}}{{$panel := .}}
                 <figure class="trend-panel trend-panel-split" tabindex="0" data-series-panel="{{.SeriesKey}}" {{template "engineering-plot-data" .Plot}}>
                   <figcaption class="trend-legend" id="{{.Plot.ID}}-caption">{{range .Paths}}<span><i style="background:{{.Color}}"></i>{{$panel.Title}}</span>{{end}}<small>Individual scale · linked cursor</small></figcaption>
-                  <div class="chart-tools" role="group" aria-label="{{.Title}} controls"><button type="button" data-chart-zoom-in>Zoom in</button><button type="button" data-chart-zoom-out>Zoom out</button><button type="button" data-chart-clear>Clear cursor</button><button type="button" data-chart-reset>Reset</button></div>
-                  <svg class="trend-chart" viewBox="0 0 780 180" role="img" aria-labelledby="{{.Plot.ID}}-caption">
+                  <div class="chart-tools" role="group" aria-label="{{.Title}} controls"><button type="button" data-chart-zoom-in aria-label="Zoom in" title="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6m-3-3v6"/></svg></button><button type="button" data-chart-zoom-out aria-label="Zoom out" title="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5M7 10h6"/></svg></button><button type="button" data-chart-clear aria-label="Clear cursor" title="Clear cursor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v5m0 8v5M3 12h5m8 0h5M9 9l6 6m0-6-6 6"/></svg></button><button type="button" data-chart-reset aria-label="Reset" title="Reset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></svg></button><button type="button" data-chart-png aria-label="Save PNG" title="Save PNG"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg></button><button type="button" data-chart-expand aria-label="Expand" title="Expand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/></svg></button></div>
+                  <svg class="trend-chart" viewBox="0 0 780 210" role="img" aria-labelledby="{{.Plot.ID}}-caption">
                     {{range .YGrid}}<line x1="{{$panel.Plot.Rect.Left}}" x2="{{$panel.Plot.Rect.Right}}" y1="{{.Position}}" y2="{{.Position}}" class="chart-grid"></line><text x="40" y="{{.Position}}" class="chart-label y-label">{{.Label}}</text>{{end}}
                     {{range $tickIndex, $tick := .XGrid}}<line x1="{{$tick.Position}}" x2="{{$tick.Position}}" y1="{{$panel.Plot.Rect.Top}}" y2="{{$panel.Plot.Rect.Bottom}}" class="chart-grid chart-grid-x"></line><text x="{{$tick.Position}}" y="{{$panel.Plot.Rect.Bottom}}" dy="20" class="chart-label x-label{{if eq $tickIndex 0}} x-label-first{{end}}">{{$tick.Label}}</text>{{end}}
                     <g data-chart-characteristic-lines data-chart-characteristic>{{range .Plot.References}}<line x1="{{.X1}}" y1="{{.Y1}}" x2="{{.X2}}" y2="{{.Y2}}" class="chart-reference chart-reference-{{.Kind}}"></line>{{end}}</g>
                     {{range .Paths}}<path d="{{.D}}" fill="none" stroke="{{.Color}}"{{if .Dash}} stroke-dasharray="{{.Dash}}"{{end}} class="trend-path" data-series-path="{{.Key}}" data-series-name="{{.Name}}"></path>{{end}}
-                    <text x="760" y="{{$panel.Plot.Rect.Bottom}}" dy="20" class="axis-title">seconds</text>
+                    <text x="405" y="{{$panel.Plot.Rect.Bottom}}" dy="48" class="axis-title">Time (seconds)</text>
                   </svg>
                   <output class="chart-readout" data-chart-readout aria-live="polite">Focus the plot, then use Left and Right arrows to inspect values.</output>
                 </figure>
