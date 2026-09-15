@@ -128,6 +128,15 @@ const fakeDocument = {
   }
 }
 
+const panFrames = new Map()
+let panFrameID = 0
+globalThis.requestAnimationFrame = callback => { panFrames.set(++panFrameID, callback); return panFrameID }
+globalThis.cancelAnimationFrame = id => panFrames.delete(id)
+function flushPanFrames() {
+  const callbacks = [...panFrames.values()]
+  panFrames.clear()
+  callbacks.forEach(callback => callback())
+}
 globalThis.document = fakeDocument
 globalThis.matchMedia = () => ({ matches: true })
 
@@ -576,10 +585,40 @@ test('drag pans a zoomed plot and releases capture on cancellation', () => {
   const before = Number(plot.root.dataset.xMin)
   plot.root.emit('pointerdown',{button:0,pointerId:1,plotX:60,plotY:50,preventDefault(){}})
   plot.root.emit('pointermove',{pointerId:1,plotX:70,plotY:50,preventDefault(){}})
+  flushPanFrames()
   assert.ok(Number(plot.root.dataset.xMin)<before)
   plot.root.emit('pointercancel',{pointerId:1})
   assert.equal(plot.root.dataset.chartPanning,undefined)
   plot.root.emit('click',{target:plot.controls.reset})
   assert.equal(plot.root.dataset.chartZoom,'1')
   assert.equal(Number(plot.root.dataset.xMin),0)
+})
+
+
+test('pan coalesces moves per frame, flushes release, and cancels stale work', () => {
+  const plot = engineeringPlot({group:`frames-${plotSequence}`,paths:[seriesPath('response','Response','M 10 90 L 60 50 L 110 10')]})
+  applyChartInspection(plot.root)
+  plot.root.emit('click',{target:plot.controls.zoomIn})
+  const path = plot.svg.querySelector('[data-series-path]')
+  const originalSet = path.setAttribute.bind(path)
+  let writes = 0
+  path.setAttribute = (key,value) => { if (key === 'd') writes++; originalSet(key,value) }
+  const down = () => plot.root.emit('pointerdown',{button:0,pointerId:1,plotX:60,plotY:50,preventDefault(){}})
+  const move = x => plot.root.emit('pointermove',{pointerId:1,plotX:x,plotY:50,preventDefault(){}})
+  down()
+  move(62); move(64); move(66)
+  assert.equal(writes,0)
+  assert.equal(panFrames.size,1)
+  flushPanFrames()
+  assert.equal(writes,1)
+  const first = Number(plot.root.dataset.xMin)
+  move(68)
+  plot.root.emit('pointerup',{type:'pointerup',pointerId:1})
+  assert.equal(writes,2)
+  assert.ok(Number(plot.root.dataset.xMin)<first)
+  assert.equal(panFrames.size,0)
+  down(); move(70)
+  plot.root.emit('pointercancel',{type:'pointercancel',pointerId:1})
+  flushPanFrames()
+  assert.equal(writes,2)
 })

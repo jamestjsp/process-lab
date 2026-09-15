@@ -573,15 +573,32 @@ function movePlotPointer(state, event) {
   if (event.pointerId !== state.pan.pointerId) return
   const point = eventPoint(event, state)
   if (!point) return
-  state.config = pannedPlotConfig(state.baseConfig, state.pan.config,
-    point.x - state.pan.point.x, point.y - state.pan.point.y)
+  state.pan.latest = point
+  if (state.pan.frame === undefined) {
+    state.pan.frame = requestAnimationFrame(() => {
+      if (!state.pan) return
+      state.pan.frame = undefined
+      renderPlotPan(state)
+    })
+  }
+  event.preventDefault()
+}
+
+function renderPlotPan(state) {
+  const pan = state.pan
+  if (!pan?.latest) return
+  state.config = pannedPlotConfig(state.baseConfig, pan.config,
+    pan.latest.x - pan.point.x, pan.latest.y - pan.point.y)
+  pan.latest = null
   for (const name of ['xMin', 'xMax', 'yMin', 'yMax']) state.root.dataset[name] = String(state.config[name])
   renderZoomGeometry(state)
-  event.preventDefault()
 }
 
 function endPlotPan(state, event) {
   if (!state.pan || event.pointerId !== state.pan.pointerId) return
+  if (state.pan.frame !== undefined) cancelAnimationFrame(state.pan.frame)
+  // A release commits the last move; cancellation or a morph discards pending work.
+  if (event.type === 'pointerup') renderPlotPan(state)
   state.pan = null
   delete state.root.dataset.chartPanning
   if (state.root.hasPointerCapture?.(event.pointerId)) state.root.releasePointerCapture(event.pointerId)
