@@ -539,6 +539,54 @@ function setChartZoom(state, nextZoom) {
   syncZoomControls(state)
 }
 
+// Translate in scale coordinates so logarithmic axes pan by ratios.
+export function pannedPlotConfig(base, current, dx, dy) {
+  const next = { ...current }
+  for (const [axis, fraction] of [['x', -dx / (current.right - current.left)], ['y', dy / (current.bottom - current.top)]]) {
+    const forward = value => current[`${axis}Scale`] === 'log10' ? Math.log10(value) : value
+    const inverse = value => current[`${axis}Scale`] === 'log10' ? 10 ** value : value
+    const lower = forward(current[`${axis}Min`])
+    const span = forward(current[`${axis}Max`]) - lower
+    const start = Math.max(forward(base[`${axis}Min`]), Math.min(forward(base[`${axis}Max`]) - span, lower + fraction * span))
+    next[`${axis}Min`] = inverse(start)
+    next[`${axis}Max`] = inverse(start + span)
+  }
+  return next
+}
+
+function beginPlotPan(state, event) {
+  if (event.button !== 0 || state.zoom <= 1 || state.pan) return
+  if (event.target?.closest?.('button, input, select, textarea')) return
+  const point = eventPoint(event, state)
+  if (!point || point.x < state.config.left || point.x > state.config.right ||
+      point.y < state.config.top || point.y > state.config.bottom) return
+  state.pan = { pointerId: event.pointerId, point, config: { ...state.config } }
+  state.root.setPointerCapture?.(event.pointerId)
+  state.root.dataset.chartPanning = 'true'
+  state.root.focus?.({ preventScroll: true })
+  inspectionCoordinator.clear(state.config.group)
+  event.preventDefault()
+}
+
+function movePlotPointer(state, event) {
+  if (!state.pan) { inspectPointer(state, event); return }
+  if (event.pointerId !== state.pan.pointerId) return
+  const point = eventPoint(event, state)
+  if (!point) return
+  state.config = pannedPlotConfig(state.baseConfig, state.pan.config,
+    point.x - state.pan.point.x, point.y - state.pan.point.y)
+  for (const name of ['xMin', 'xMax', 'yMin', 'yMax']) state.root.dataset[name] = String(state.config[name])
+  renderZoomGeometry(state)
+  event.preventDefault()
+}
+
+function endPlotPan(state, event) {
+  if (!state.pan || event.pointerId !== state.pan.pointerId) return
+  state.pan = null
+  delete state.root.dataset.chartPanning
+  if (state.root.hasPointerCapture?.(event.pointerId)) state.root.releasePointerCapture(event.pointerId)
+}
+
 function closestControl(state, event, selector) {
   const control = event.target?.closest?.(selector)
   return control && state.root.contains(control) ? control : null
@@ -690,6 +738,7 @@ function initializePlot(root) {
   const existing = plotStates.get(root)
   if (existing) {
     if (existing.svg !== svg || (existing.baseConfig && !svg.contains(existing.clip))) {
+      if (existing.pan) endPlotPan(existing, existing.pan)
       existing.cursor = null
       existing.baseViewBox = readViewBox(svg)
       existing.zoom = MIN_CHART_ZOOM
@@ -731,7 +780,11 @@ function initializePlot(root) {
   inspectionCoordinator.register(config.group, state)
 
   if (!root.hasAttribute?.('tabindex')) root.setAttribute?.('tabindex', '0')
-  root.addEventListener('pointermove', (event) => inspectPointer(state, event))
+  root.addEventListener('pointerdown', (event) => beginPlotPan(state, event))
+  root.addEventListener('pointermove', (event) => movePlotPointer(state, event))
+  for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    root.addEventListener(name, (event) => endPlotPan(state, event))
+  }
   root.addEventListener('pointerleave', () => inspectionCoordinator.clear(state.config.group))
   root.addEventListener('keydown', (event) => inspectKeyboard(state, event))
   root.addEventListener('click', (event) => activateChartControl(state, event))

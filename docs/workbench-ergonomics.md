@@ -483,3 +483,10 @@ test closes and reopens the file to prove the assignment is not repeated.
 Behaviours confirmed by hand in the same pass: collapsing both rails to
 icon strips, dragging the dock between header-only and 70vh, and the
 readout rail tracking the cursor in sheet coordinates.
+
+## Plot navigation
+
+Zoom in, then drag inside any plot to pan its horizontal and vertical axes.
+Panning stays within the original data range and works in expanded views.
+Release the pointer to resume cursor inspection. Reset restores the full range;
+PNG export uses the current zoomed and panned view.
