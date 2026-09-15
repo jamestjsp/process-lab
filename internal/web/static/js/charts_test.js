@@ -141,7 +141,8 @@ const {
   parsePathVertices,
   scaleValue,
   seriesValuesAtX,
-  zoomedPlotConfig
+  zoomedPlotConfig,
+  pannedPlotConfig
 } = await import('./charts.js')
 
 test('normalizes trend layouts to the server-rendered overlay fallback', () => {
@@ -552,4 +553,33 @@ test('zoom rebuilds clipping and source geometry after an identity-preserving mo
   assert.ok(plot.svg.children.some((child) => child.tagName === 'DEFS'))
   plot.root.emit('click', { target: plot.controls.reset })
   assert.equal(path.getAttribute('d'), 'M 10 80 L 60 40 L 110 20')
+})
+
+
+test('pan preserves linear and logarithmic spans and clamps to original bounds', () => {
+  const base = {left:0,right:100,top:0,bottom:100,xMin:1,xMax:1000,xScale:'log10',yMin:0,yMax:100,yScale:'linear'}
+  const current = {...base,xMin:10,xMax:100,yMin:25,yMax:75}
+  const moved = pannedPlotConfig(base,current,50,20)
+  assert.ok(Math.abs(moved.xMin - Math.sqrt(10)) < 1e-10)
+  assert.ok(Math.abs(moved.xMax / moved.xMin - 10) < 1e-10)
+  assert.equal(moved.yMin,35)
+  assert.equal(moved.yMax,85)
+  const edge = pannedPlotConfig(base,current,1000,-1000)
+  assert.equal(edge.xMin,1)
+  assert.equal(edge.yMin,0)
+})
+
+test('drag pans a zoomed plot and releases capture on cancellation', () => {
+  const plot = engineeringPlot({group:`pan-${plotSequence}`,paths:[seriesPath('response','Response','M 10 90 L 60 50 L 110 10')]})
+  applyChartInspection(plot.root)
+  plot.root.emit('click',{target:plot.controls.zoomIn})
+  const before = Number(plot.root.dataset.xMin)
+  plot.root.emit('pointerdown',{button:0,pointerId:1,plotX:60,plotY:50,preventDefault(){}})
+  plot.root.emit('pointermove',{pointerId:1,plotX:70,plotY:50,preventDefault(){}})
+  assert.ok(Number(plot.root.dataset.xMin)<before)
+  plot.root.emit('pointercancel',{pointerId:1})
+  assert.equal(plot.root.dataset.chartPanning,undefined)
+  plot.root.emit('click',{target:plot.controls.reset})
+  assert.equal(plot.root.dataset.chartZoom,'1')
+  assert.equal(Number(plot.root.dataset.xMin),0)
 })

@@ -385,3 +385,33 @@ test("context-menu flip swaps ports and survives reload without reflecting label
     assert.deepEqual(problems, []);
   } finally { await page.close(); }
 });
+
+test('zoomed plots pan by dragging in normal and expanded views', async () => {
+  const {page, problems} = await openWorkbench();
+  try {
+    await installMultiTrendFlow(page);
+    const plot = page.locator('[data-plot-id="simulation-trend"]');
+    for (const expanded of [false, true]) {
+      if (expanded) await plot.locator('[data-chart-expand]').click();
+      await plot.locator('[data-chart-zoom-in]').click();
+      const before = await plot.evaluate(root => ({min:+root.dataset.xMin,max:+root.dataset.xMax}));
+      await plot.locator('svg:not([aria-hidden])').scrollIntoViewIfNeeded();
+      const coords = await plot.evaluate(root => {
+        const svg = root.querySelector('svg:not([aria-hidden])');
+        const box = svg.getBoundingClientRect();
+        return {x:box.x+box.width/2,y:box.y+box.height/2};
+      });
+      await page.mouse.move(coords.x,coords.y);
+      await page.mouse.down();
+      await page.mouse.move(coords.x+25,coords.y+10,{steps:5});
+      await page.mouse.up();
+      const after = await plot.evaluate(root => ({min:+root.dataset.xMin,max:+root.dataset.xMax,panning:root.dataset.chartPanning}));
+      assert.ok(after.min < before.min, JSON.stringify({expanded,before,after,coords}));
+      assert.ok(Math.abs((after.max-after.min)-(before.max-before.min)) < 1e-9);
+      assert.equal(after.panning,undefined);
+      await plot.locator('[data-chart-reset]').click();
+      if (expanded) await page.keyboard.press('Escape');
+    }
+    assert.deepEqual(problems,[]);
+  } finally { await page.close(); }
+});
